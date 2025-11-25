@@ -10,19 +10,66 @@ datasource db {
     provider = "postgresql"
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+// =============================================================================
+// ENUMS
+// =============================================================================
 
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
+/// Environment for process versions and API keys
+enum Environment {
+    SANDBOX
+    PRODUCTION
 }
 
-// Necessary for Next auth
+// =============================================================================
+// MULTI-TENANT CORE
+// =============================================================================
+
+/// Tenant represents a customer organization
+/// All tenant-scoped data references this entity
+model Tenant {
+    id        String    @id // ten_* prefix
+    name      String
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    deletedAt DateTime?
+
+    // Relations
+    users         User[]
+    processes     Process[]
+    apiKeys       ApiKey[]
+    callLogs      CallLog[]
+    responseCache ResponseCache[]
+    rateLimits    RateLimit[]
+
+    @@index([deletedAt])
+}
+
+// =============================================================================
+// AUTHENTICATION (NextAuth.js)
+// =============================================================================
+
+/// User account linked to a tenant
+model User {
+    id            String    @id // usr_* prefix
+    tenantId      String
+    email         String    @unique
+    emailVerified DateTime?
+    name          String?
+    image         String?
+    passwordHash  String?   // bcrypt hash for credentials auth (null for OAuth-only users)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    // Relations
+    tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+    accounts Account[]
+    sessions Session[]
+
+    @@index([tenantId])
+    @@index([email])
+}
+
+/// OAuth account connections (NextAuth.js)
 model Account {
     id                       String  @id @default(cuid())
     userId                   String
@@ -36,35 +83,185 @@ model Account {
     scope                    String?
     id_token                 String? // @db.Text
     session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
     refresh_token_expires_in Int?
 
+    // Relations
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
     @@unique([provider, providerAccountId])
+    @@index([userId])
 }
 
+/// User sessions (NextAuth.js)
 model Session {
     id           String   @id @default(cuid())
     sessionToken String   @unique
     userId       String
     expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // Relations
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
-model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
-}
-
+/// Email verification tokens (NextAuth.js)
 model VerificationToken {
     identifier String
     token      String   @unique
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+// =============================================================================
+// INTELLIGENCE PROCESSES
+// =============================================================================
+
+/// Process defines an intelligence endpoint configuration
+model Process {
+    id           String    @id // proc_* prefix
+    tenantId     String
+    name         String
+    description  String?
+    inputSchema  Json // JSON Schema for input validation
+    outputSchema Json // JSON Schema for output validation
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    deletedAt    DateTime?
+
+    // Relations
+    tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+    versions      ProcessVersion[]
+    callLogs      CallLog[]
+    responseCache ResponseCache[]
+    rateLimits    RateLimit[]
+
+    @@index([tenantId])
+    @@index([tenantId, deletedAt])
+    @@index([name])
+}
+
+/// ProcessVersion represents a specific version of a process configuration
+model ProcessVersion {
+    id           String       @id // procv_* prefix
+    processId    String
+    version      String // Semantic version (e.g., "1.0.0")
+    config       Json // ProcessConfig: systemPrompt, temperature, cacheTtl, etc.
+    environment  Environment
+    publishedAt  DateTime?
+    deprecatedAt DateTime?
+    createdAt    DateTime     @default(now())
+
+    // Relations
+    process  Process   @relation(fields: [processId], references: [id], onDelete: Cascade)
+    callLogs CallLog[]
+
+    @@unique([processId, version])
+    @@index([processId])
+    @@index([processId, environment])
+    @@index([environment, deprecatedAt])
+}
+
+// =============================================================================
+// API KEY MANAGEMENT
+// =============================================================================
+
+/// API keys for authenticating public API requests
+model ApiKey {
+    id          String       @id // key_* prefix
+    tenantId    String
+    name        String // User-friendly name for the key
+    keyHash     String       @unique // SHA-256 hash of the actual key
+    scopes      Json // Array of scopes: ["process:*"] or ["process:proc_abc123"]
+    environment Environment
+    expiresAt   DateTime?
+    createdAt   DateTime     @default(now())
+    revokedAt   DateTime?
+    lastUsedAt  DateTime?
+
+    // Relations
+    tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+    @@index([tenantId])
+    @@index([keyHash])
+    @@index([tenantId, environment])
+    @@index([expiresAt])
+}
+
+// =============================================================================
+// OBSERVABILITY & LOGGING
+// =============================================================================
+
+/// Call logs for API request history and debugging
+model CallLog {
+    id               String   @id // req_* prefix
+    tenantId         String
+    processId        String
+    processVersionId String
+    inputHash        String // SHA-256 hash of normalized input
+    input            Json? // Optional: actual input (can be anonymized)
+    output           Json? // Response data
+    latencyMs        Int // Request duration in milliseconds
+    cached           Boolean  @default(false)
+    errorCode        String? // Error code if request failed
+    errorMessage     String? // Human-readable error message
+    createdAt        DateTime @default(now())
+
+    // Relations
+    tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+    process        Process        @relation(fields: [processId], references: [id], onDelete: Cascade)
+    processVersion ProcessVersion @relation(fields: [processVersionId], references: [id], onDelete: Cascade)
+
+    @@index([tenantId])
+    @@index([processId])
+    @@index([tenantId, processId])
+    @@index([createdAt])
+    @@index([tenantId, createdAt])
+}
+
+// =============================================================================
+// CACHING
+// =============================================================================
+
+/// Response cache for idempotent requests
+model ResponseCache {
+    id        String   @id @default(cuid())
+    tenantId  String
+    processId String
+    inputHash String // Cache key: SHA-256 of tenant + process + input
+    response  Json // Cached response data
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    // Relations
+    tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+    process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+    @@unique([tenantId, processId, inputHash])
+    @@index([expiresAt])
+    @@index([tenantId, processId, inputHash])
+}
+
+// =============================================================================
+// RATE LIMITING & QUOTAS
+// =============================================================================
+
+/// Rate limit tracking for sliding window algorithm
+model RateLimit {
+    id           String   @id @default(cuid())
+    tenantId     String
+    processId    String? // Null = tenant-level limit
+    windowStart  DateTime
+    requestCount Int      @default(0)
+    createdAt    DateTime @default(now())
+
+    // Relations
+    tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+    process Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+    @@unique([tenantId, processId, windowStart])
+    @@index([tenantId])
+    @@index([tenantId, windowStart])
+    @@index([windowStart])
 }

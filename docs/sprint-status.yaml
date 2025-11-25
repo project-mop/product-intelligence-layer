@@ -37,9 +37,9 @@ story_location: "{project-root}/docs/stories"
 development_status:
   # Epic 1: Foundation & Infrastructure (6 stories)
   epic-1: contexted
-  1-1-project-setup-infrastructure-initialization: ready-for-dev
-  1-2-multi-tenant-database-schema: backlog
-  1-3-user-authentication-system: backlog
+  1-1-project-setup-infrastructure-initialization: done
+  1-2-multi-tenant-database-schema: done
+  1-3-user-authentication-system: done
   1-4-api-token-management: backlog
   1-5-tenant-encryption-at-rest: backlog
   1-6-audit-logging-foundation: backlog

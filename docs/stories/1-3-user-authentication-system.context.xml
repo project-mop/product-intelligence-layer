@@ -1,0 +1,222 @@
+<story-context id="1-3-user-authentication-system" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3</storyId>
+    <title>User Authentication System</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3-user-authentication-system.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to sign up, log in, and reset my password securely</iWant>
+    <soThat>I can access my account and protect my data</soThat>
+    <tasks>
+      <task id="1" acs="1,3,4,7">Configure NextAuth.js with Credentials Provider</task>
+      <task id="2" acs="1,2,7">Create User Signup Flow with tRPC router</task>
+      <task id="3" acs="1,7">Update User Model for Authentication (add passwordHash)</task>
+      <task id="4" acs="5,6">Implement Password Reset Flow with tokens</task>
+      <task id="5" acs="5">Create N8N Webhook Client for email notifications</task>
+      <task id="6" acs="1,2,3,4,5,6">Create Auth UI Pages (login, signup, forgot-password, reset-password)</task>
+      <task id="7" acs="1-8">Testing (unit + integration)</task>
+      <task id="8" acs="1-8">Verification (typecheck, lint, build)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">User can sign up with email and password; account is created</ac>
+    <ac id="2">User receives confirmation of account creation</ac>
+    <ac id="3">User can log in with correct credentials; session is established</ac>
+    <ac id="4">User cannot log in with incorrect credentials; clear error returned</ac>
+    <ac id="5">User can request password reset; receives email (via N8N webhook)</ac>
+    <ac id="6">User can reset password with valid token; can log in with new password</ac>
+    <ac id="7">Passwords are hashed (not stored in plaintext)</ac>
+    <ac id="8">Sessions expire after configured period (default 30 days)</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Story 1.3: User Authentication</section>
+        <snippet>Acceptance criteria 1.3.1-8 define signup, login, password reset flows. Security requirements: bcrypt cost factor 12, HTTP-only secure cookies, CSRF protection.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>User Signup Flow</section>
+        <snippet>9-step flow: validate input, check email uniqueness, create Tenant, create User with hashed password, create Session, write AuditLog, trigger N8N welcome email.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Auth Router tRPC Procedures</section>
+        <snippet>signup mutation: {email, password, name} → {user, session}. requestPasswordReset mutation: {email} → {success}. resetPassword mutation: {token, newPassword} → {success}.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Authentication</section>
+        <snippet>NextAuth.js for session-based authentication with secure HTTP-only cookies. Tenant association on user records. Extensible for OAuth providers.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>ADR-005: N8N for Email Workflows</section>
+        <snippet>Handle all email via N8N workflows, not in-app. Stripe webhook → N8N → emails. No email service integration in codebase.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Project Structure</section>
+        <snippet>Auth routes in src/app/(auth)/. tRPC routers in src/server/api/routers/. Services in src/server/services/.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.3: User Authentication System</section>
+        <snippet>Covers FR-901 (signup), FR-902 (login), FR-903 (password reset). Prerequisites: Story 1.2. Uses JWT for session tokens with rate limiting on auth endpoints.</snippet>
+      </doc>
+      <doc>
+        <path>docs/rls-strategy.md</path>
+        <title>Row-Level Security Strategy</title>
+        <section>MVP Approach</section>
+        <snippet>Application-level tenant filtering for MVP. All queries include tenantId in WHERE clause. RLS as future defense-in-depth layer.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>src/server/auth/config.ts</path>
+        <kind>config</kind>
+        <symbol>authConfig</symbol>
+        <reason>Existing NextAuth configuration to extend with CredentialsProvider. Currently has empty providers array with PrismaAdapter configured.</reason>
+      </file>
+      <file>
+        <path>src/server/auth/index.ts</path>
+        <kind>module</kind>
+        <symbol>auth</symbol>
+        <reason>Auth exports to use. Contains auth() function and handlers.</reason>
+      </file>
+      <file>
+        <path>src/server/db.ts</path>
+        <kind>service</kind>
+        <symbol>db</symbol>
+        <reason>Prisma client singleton with pg adapter pattern. Use for all database operations.</reason>
+      </file>
+      <file>
+        <path>src/lib/id.ts</path>
+        <kind>utility</kind>
+        <symbol>generateTenantId, generateUserId</symbol>
+        <reason>ID generation utilities for creating prefixed IDs. Use generateTenantId() for new tenants, generateUserId() for new users.</reason>
+      </file>
+      <file>
+        <path>src/server/api/trpc.ts</path>
+        <kind>framework</kind>
+        <symbol>createTRPCRouter, publicProcedure, protectedProcedure</symbol>
+        <reason>tRPC setup with context including db and session. Use publicProcedure for signup, protectedProcedure for authenticated routes.</reason>
+      </file>
+      <file>
+        <path>src/server/api/root.ts</path>
+        <kind>router</kind>
+        <symbol>appRouter</symbol>
+        <reason>Root tRPC router where new auth router must be registered.</reason>
+      </file>
+      <file>
+        <path>prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>User, Tenant, Session, Account, VerificationToken</symbol>
+        <reason>Database schema with User model (needs passwordHash field), Tenant, Session, and VerificationToken models for auth. User already has tenantId FK.</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="next-auth" version="5.0.0-beta.25">Authentication framework (Auth.js)</package>
+        <package name="@auth/prisma-adapter" version="^2.7.2">Prisma adapter for NextAuth</package>
+        <package name="@prisma/client" version="^7.0.1">Database ORM client</package>
+        <package name="zod" version="^3.24.2">Schema validation for input validation</package>
+        <package name="@trpc/server" version="^11.0.0">tRPC server for API procedures</package>
+        <package name="bcryptjs" version="TO_ADD">Password hashing (needs to be installed)</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="security">Passwords MUST be hashed with bcrypt cost factor 12 before storage</constraint>
+    <constraint type="security">API keys and tokens stored as SHA-256 hashes only, never plaintext</constraint>
+    <constraint type="security">Sessions use HTTP-only secure cookies via NextAuth</constraint>
+    <constraint type="architecture">All queries MUST include tenantId filter for tenant isolation</constraint>
+    <constraint type="architecture">Use tRPC publicProcedure for signup (unauthenticated), protectedProcedure for authenticated routes</constraint>
+    <constraint type="architecture">N8N webhooks are fire-and-forget with 5-second timeout</constraint>
+    <constraint type="naming">User IDs use "usr_" prefix via generateUserId()</constraint>
+    <constraint type="naming">Tenant IDs use "ten_" prefix via generateTenantId()</constraint>
+    <constraint type="pattern">Follow existing Prisma adapter pattern in src/server/db.ts</constraint>
+    <constraint type="pattern">Auth routes go in src/app/(auth)/ route group</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Auth Router - signup</name>
+      <kind>tRPC mutation</kind>
+      <signature>signup: publicProcedure.input(z.object({ email: z.string().email(), password: z.string().min(8), name: z.string().optional() })).mutation()</signature>
+      <path>src/server/api/routers/auth.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>Auth Router - requestPasswordReset</name>
+      <kind>tRPC mutation</kind>
+      <signature>requestPasswordReset: publicProcedure.input(z.object({ email: z.string().email() })).mutation()</signature>
+      <path>src/server/api/routers/auth.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>Auth Router - resetPassword</name>
+      <kind>tRPC mutation</kind>
+      <signature>resetPassword: publicProcedure.input(z.object({ token: z.string(), newPassword: z.string().min(8) })).mutation()</signature>
+      <path>src/server/api/routers/auth.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>N8N Webhook Client</name>
+      <kind>service</kind>
+      <signature>triggerWelcomeEmail(params: { email: string, name: string, tenantId: string }): Promise&lt;void&gt;</signature>
+      <path>src/server/services/n8n/client.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>N8N Webhook Client</name>
+      <kind>service</kind>
+      <signature>triggerPasswordResetEmail(params: { email: string, resetToken: string, resetUrl: string }): Promise&lt;void&gt;</signature>
+      <path>src/server/services/n8n/client.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>NextAuth CredentialsProvider</name>
+      <kind>config</kind>
+      <signature>CredentialsProvider({ credentials: { email, password }, authorize: async (credentials) =&gt; User | null })</signature>
+      <path>src/server/auth/config.ts (MODIFY)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing uses Vitest for unit and integration tests. Tests should be co-located with implementation (e.g., auth.test.ts alongside auth.ts).
+      Focus on: password hashing/verification, token generation/validation, signup flow (create tenant + user), login flow (session creation),
+      password reset flow (token lifecycle). Mock N8N webhook calls in tests. Use test database for integration tests.
+    </standards>
+    <locations>
+      <location>tests/unit/</location>
+      <location>tests/integration/</location>
+      <location>src/**/*.test.ts (co-located)</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test signup creates both Tenant and User records with correct IDs and hashed password</idea>
+      <idea ac="3">Test login with correct credentials returns valid session</idea>
+      <idea ac="4">Test login with incorrect credentials returns appropriate error, no session created</idea>
+      <idea ac="5">Test password reset request creates VerificationToken and triggers N8N webhook</idea>
+      <idea ac="6">Test password reset with valid token updates password hash, invalidates token</idea>
+      <idea ac="6">Test password reset with expired/invalid token returns error</idea>
+      <idea ac="7">Test that stored passwords are bcrypt hashes, not plaintext</idea>
+      <idea ac="8">Test session expiration is set to configured value (30 days default)</idea>
+    </ideas>
+  </tests>
+</story-context>

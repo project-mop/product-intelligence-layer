@@ -16,17 +16,21 @@ export const env = createEnv({
         ? z.string()
         : z.string().optional(),
     NEXTAUTH_URL: z.string().url().optional(),
+    NEXTAUTH_SESSION_MAX_AGE: z.coerce.number().optional(), // Session max age in seconds (default 30 days)
 
     // Node environment
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
 
+    // N8N Webhooks (email workflows)
+    N8N_WEBHOOK_BASE_URL: z.string().url().optional(),
+    N8N_WEBHOOK_SECRET: z.string().optional(),
+
     // Future: External Services (uncomment when needed)
     // ANTHROPIC_API_KEY: z.string().optional(),
     // STRIPE_SECRET_KEY: z.string().optional(),
     // STRIPE_WEBHOOK_SECRET: z.string().optional(),
-    // N8N_WEBHOOK_SECRET: z.string().optional(),
   },
 
   /**
@@ -47,7 +51,10 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    NEXTAUTH_SESSION_MAX_AGE: process.env.NEXTAUTH_SESSION_MAX_AGE,
     NODE_ENV: process.env.NODE_ENV,
+    N8N_WEBHOOK_BASE_URL: process.env.N8N_WEBHOOK_BASE_URL,
+    N8N_WEBHOOK_SECRET: process.env.N8N_WEBHOOK_SECRET,
     // Future: Add runtime env vars here when uncommented above
   },
 

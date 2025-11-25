@@ -78,6 +78,34 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Authentication
+
+The application uses NextAuth.js with email/password authentication:
+
+- **Signup:** `/signup` - Create a new account with email and password
+- **Login:** `/login` - Sign in with existing credentials
+- **Forgot Password:** `/forgot-password` - Request password reset email
+- **Reset Password:** `/reset-password?token=...` - Set new password
+
+### Session Configuration
+
+Sessions are stored in the database and expire after 30 days by default. Configure via:
+
+```bash
+# In .env (optional, value in seconds)
+NEXTAUTH_SESSION_MAX_AGE=2592000  # 30 days
+```
+
+### Email Notifications (N8N)
+
+Password reset and welcome emails are triggered via N8N webhooks. Configure:
+
+```bash
+# In .env
+N8N_WEBHOOK_BASE_URL="https://your-n8n-instance.com/webhook"
+N8N_WEBHOOK_SECRET="your-secret"
+```
+
 ## Available Scripts
 
 | Script | Description |
@@ -87,6 +115,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `pnpm start` | Start production server |
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Run ESLint |
+| `pnpm test` | Run all tests |
+| `pnpm test:unit` | Run unit tests only |
+| `pnpm test:watch` | Run tests in watch mode |
+| `pnpm test:coverage` | Run tests with coverage report |
 | `pnpm prisma db push` | Push Prisma schema to database |
 | `pnpm prisma studio` | Open Prisma Studio |
 | `pnpm prisma generate` | Regenerate Prisma client |
@@ -98,8 +130,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Language:** TypeScript 5.9.x
 - **API:** tRPC 11.x (internal), REST (public)
 - **Database:** PostgreSQL 16.x via Prisma 7.x
-- **Auth:** NextAuth.js 5.x
+- **Auth:** NextAuth.js 5.x (Credentials Provider)
 - **Styling:** Tailwind CSS 4.x
+- **Testing:** Vitest + Testing Library
 - **Hosting:** Railway
 
 ## Project Structure
@@ -108,10 +141,18 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 product-intelligence-layer/
 ├── src/
 │   ├── app/           # Next.js App Router
+│   │   └── (auth)/    # Authentication pages (login, signup, etc.)
 │   ├── server/        # Backend logic (tRPC, services)
+│   │   ├── api/       # tRPC routers
+│   │   ├── auth/      # NextAuth configuration
+│   │   └── services/  # External service clients (N8N, etc.)
 │   ├── trpc/          # tRPC client setup
+│   ├── lib/           # Shared utilities
 │   └── styles/        # Global styles
 ├── prisma/            # Database schema
+├── tests/             # Test files
+│   ├── unit/          # Unit tests
+│   └── integration/   # Integration tests
 ├── docs/              # Project documentation
 └── bmad/              # BMAD methodology files
 ```

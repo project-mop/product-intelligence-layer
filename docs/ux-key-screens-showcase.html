@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Intelligence Layer - Key Screens Showcase</title>
+  <style>
+    :root {
+      --primary: #f97316;
+      --primary-light: #fb923c;
+      --primary-dark: #ea580c;
+      --secondary: #78716c;
+      --accent: #eab308;
+      --success: #22c55e;
+      --success-light: #dcfce7;
+      --success-dark: #166534;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --warning-dark: #92400e;
+      --error: #dc2626;
+      --error-light: #fef2f2;
+      --error-dark: #991b1b;
+      --bg-warm: #fffbeb;
+      --bg-white: #ffffff;
+      --border: #fef3c7;
+      --border-neutral: #e7e5e4;
+      --text-primary: #1c1917;
+      --text-secondary: #57534e;
+      --text-muted: #a8a29e;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f4;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* Top Navigation */
+    .showcase-nav {
+      background: white;
+      border-bottom: 1px solid var(--border-neutral);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .showcase-nav h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .showcase-nav h1 span {
+      color: var(--primary);
+    }
+
+    .screen-tabs {
+      display: flex;
+      gap: 4px;
+      background: #f5f5f4;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .screen-tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .screen-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .screen-tab.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Screen Container */
+    .screens-container {
+      padding: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .screen {
+      display: none;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .screen-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-neutral);
+      background: #fafaf9;
+    }
+
+    .screen-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .screen-header p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .screen-content {
+      min-height: 600px;
+    }
+
+    /* =========================== */
+    /* SHARED APP COMPONENTS */
+    /* =========================== */
+
+    .app-layout {
+      display: flex;
+      min-height: 600px;
+      background: var(--bg-warm);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: white;
+      border-right: 1px solid var(--border-neutral);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-logo {
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-neutral);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .logo-text {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text-primary);
+    }
+
+    .sidebar-nav {
+      padding: 12px 0;
+      flex: 1;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-warm);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: var(--bg-warm);
+      color: var(--primary);
+      border-left-color: var(--primary);
+      font-weight: 500;
+    }
+
+    .nav-icon {
+      width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-neutral);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-name {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .user-plan {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      padding: 32px;
+      overflow: auto;
+    }
+
+    /* Page Header */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .page-subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--text-primary);
+      border: 1px solid var(--border-neutral);
+    }
+
+    .btn-secondary:hover {
+      background: #fafaf9;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--primary);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(249, 115, 22, 0.1);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border-neutral);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .stat-trend {
+      font-size: 12px;
+      color: var(--success);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-trend.down {
+      color: var(--error);
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 32px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .section-link {
+      font-size: 13px;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* Intelligence Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .intelligence-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border-neutral);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .intelligence-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-warm);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-neutral);
+    }
+
+    .card-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .status-active {
+      background: var(--success-light);
+      color: var(--success-dark);
+    }
+
+    .status-draft {
+      background: var(--warning-light);
+      color: var(--warning-dark);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* =========================== */
+    /* SCREEN 1: DASHBOARD */
+    /* =========================== */
+
+    /* Already covered by shared components above */
+
+    /* =========================== */
+    /* SCREEN 2: INTELLIGENCES LIST */
+    /* =========================== */
+
+    .cards-grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .search-input {
+      flex: 1;
+      max-width: 320px;
+      padding: 10px 16px;
+      padding-left: 40px;
+      border: 1px solid var(--border-neutral);
+      border-radius: 8px;
+      font-size: 14px;
+      background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a8a29e'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'%3E%3C/path%3E%3C/svg%3E") no-repeat 12px center;
+      background-size: 18px;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    }
+
+    .filter-chip {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--border-neutral);
+      background: white;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-chip:hover {
+      border-color: var(--text-muted);
+    }
+
+    .filter-chip.active {
+      background: var(--text-primary);
+      color: white;
+      border-color: var(--text-primary);
+    }
+
+    /* =========================== */
+    /* SCREEN 3: CREATE WIZARD */
+    /* =========================== */
+
+    .wizard-layout {
+      min-height: 600px;
+      background: linear-gradient(180deg, var(--bg-warm) 0%, white 100%);
+    }
+
+    .wizard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 32px;
+      background: white;
+      border-bottom: 1px solid var(--border-neutral);
+    }
+
+    .wizard-logo {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--primary);
+    }
+
+    .wizard-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .progress-step.active {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .progress-step.done {
+      color: var(--success);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--border-neutral);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .progress-step.active .step-number {
+      background: var(--primary);
+      color: white;
+    }
+
+    .progress-step.done .step-number {
+      background: var(--success);
+      color: white;
+    }
+
+    .progress-line {
+      width: 48px;
+      height: 2px;
+      background: var(--border-neutral);
+    }
+
+    .progress-line.done {
+      background: var(--success);
+    }
+
+    .wizard-close {
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: none;
+      border: none;
+    }
+
+    .wizard-content {
+      max-width: 640px;
+      margin: 60px auto;
+      padding: 0 32px;
+    }
+
+    .wizard-title {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .wizard-title h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .wizard-title p {
+      font-size: 16px;
+      color: var(--text-secondary);
+    }
+
+    .wizard-form {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .form-field {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--border-neutral);
+      border-radius: 10px;
+      font-size: 15px;
+      transition: border-color 0.15s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .form-textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--border-neutral);
+      border-radius: 10px;
+      font-size: 15px;
+      min-height: 100px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .wizard-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 32px;
+    }
+
+    /* =========================== */
+    /* SCREEN 4: INTELLIGENCE DETAIL */
+    /* =========================== */
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+    }
+
+    .detail-title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .detail-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg-warm);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .detail-title {
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .detail-meta {
+      display: flex;
+      gap: 16px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border-neutral);
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    .detail-panel {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border-neutral);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-neutral);
+      font-weight: 600;
+      font-size: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-content {
+      padding: 20px;
+    }
+
+    .endpoint-display {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #1c1917;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+
+    .endpoint-method {
+      background: var(--success);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .endpoint-url {
+      color: #fafaf9;
+      font-family: monospace;
+      font-size: 13px;
+      flex: 1;
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-neutral);
+      font-size: 14px;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: var(--text-secondary);
+    }
+
+    .info-value {
+      font-weight: 500;
+    }
+
+    /* =========================== */
+    /* SCREEN 5: API TEST CONSOLE */
+    /* =========================== */
+
+    .console-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      height: 100%;
+    }
+
+    .console-panel {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border-neutral);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .console-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-neutral);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .console-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .console-body {
+      flex: 1;
+      padding: 16px;
+      background: #1c1917;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 13px;
+      color: #fafaf9;
+      overflow: auto;
+    }
+
+    .json-key {
+      color: #7dd3fc;
+    }
+
+    .json-string {
+      color: #86efac;
+    }
+
+    .json-number {
+      color: #fcd34d;
+    }
+
+    .console-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-neutral);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .latency-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .latency-value {
+      font-weight: 600;
+      color: var(--success);
+    }
+
+    .response-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .status-code {
+      background: var(--success-light);
+      color: var(--success-dark);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    /* =========================== */
+    /* SCREEN 6: LOGS */
+    /* =========================== */
+
+    .logs-filters {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .date-picker {
+      padding: 10px 16px;
+      border: 1px solid var(--border-neutral);
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .logs-table {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border-neutral);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: grid;
+      grid-template-columns: 180px 2fr 100px 100px 80px;
+      padding: 14px 20px;
+      background: #fafaf9;
+      border-bottom: 1px solid var(--border-neutral);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 180px 2fr 100px 100px 80px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-neutral);
+      font-size: 13px;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .table-row:hover {
+      background: var(--bg-warm);
+    }
+
+    .table-row:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+    }
+
+    .log-intelligence {
+      font-weight: 500;
+    }
+
+    .log-status {
+      display: inline-flex;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .log-status.success {
+      background: var(--success-light);
+      color: var(--success-dark);
+    }
+
+    .log-status.error {
+      background: var(--error-light);
+      color: var(--error-dark);
+    }
+
+    .log-latency {
+      color: var(--text-secondary);
+    }
+
+    .log-expand {
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    /* =========================== */
+    /* SCREEN 7: SETTINGS */
+    /* =========================== */
+
+    .settings-layout {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 32px;
+    }
+
+    .settings-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-nav-item {
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .settings-nav-item:hover {
+      background: #fafaf9;
+      color: var(--text-primary);
+    }
+
+    .settings-nav-item.active {
+      background: var(--bg-warm);
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .settings-content {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border-neutral);
+      padding: 32px;
+    }
+
+    .settings-section {
+      margin-bottom: 32px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border-neutral);
+    }
+
+    .settings-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .settings-section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .settings-section-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .api-key-display {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fafaf9;
+      border: 1px solid var(--border-neutral);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+
+    .api-key-value {
+      flex: 1;
+      font-family: monospace;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .api-key-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .usage-bar {
+      height: 8px;
+      background: var(--border-neutral);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .usage-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 4px;
+    }
+
+    .usage-text {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* =========================== */
+    /* SCREEN 8: SUCCESS STATE */
+    /* =========================== */
+
+    .success-layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 600px;
+      background: linear-gradient(180deg, var(--bg-warm) 0%, white 100%);
+      padding: 60px 32px;
+      text-align: center;
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--success-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin-bottom: 24px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .success-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .success-message {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      max-width: 400px;
+    }
+
+    .success-endpoint {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 32px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 32px;
+    }
+
+    .success-endpoint-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .success-endpoint-url {
+      font-family: monospace;
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+
+    .success-actions {
+      display: flex;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="showcase-nav">
+    <h1>Product<span>Intel</span> - Key Screens Showcase</h1>
+    <div class="screen-tabs">
+      <button class="screen-tab active" data-screen="dashboard">Dashboard</button>
+      <button class="screen-tab" data-screen="intelligences">Intelligences</button>
+      <button class="screen-tab" data-screen="create">Create</button>
+      <button class="screen-tab" data-screen="detail">Detail</button>
+      <button class="screen-tab" data-screen="console">Test Console</button>
+      <button class="screen-tab" data-screen="logs">Logs</button>
+      <button class="screen-tab" data-screen="settings">Settings</button>
+      <button class="screen-tab" data-screen="success">Success</button>
+    </div>
+  </nav>
+
+  <div class="screens-container">
+    <!-- SCREEN 1: DASHBOARD -->
+    <div class="screen active" id="screen-dashboard">
+      <div class="screen-header">
+        <h2>Dashboard</h2>
+        <p>The main entry point after login. Shows overview stats and recent intelligences.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item active">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="page-header">
+              <div>
+                <h1 class="page-title">Welcome back, Zac</h1>
+                <p class="page-subtitle">Here's what's happening with your intelligences today.</p>
+              </div>
+              <button class="btn btn-primary">+ New Intelligence</button>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">Active Intelligences</div>
+                <div class="stat-value">12</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">API Calls Today</div>
+                <div class="stat-value">2,847</div>
+                <div class="stat-trend">↑ 12% from yesterday</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value">99.2%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Avg Response</div>
+                <div class="stat-value">1.2s</div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-header">
+                <h2 class="section-title">Recent Intelligences</h2>
+                <span class="section-link">View all →</span>
+              </div>
+              <div class="cards-grid">
+                <div class="intelligence-card">
+                  <div class="card-icon">📝</div>
+                  <div class="card-header">
+                    <div>
+                      <div class="card-title">Product Description API</div>
+                    </div>
+                    <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                  </div>
+                  <div class="card-desc">Generates compelling product descriptions from attributes and specifications.</div>
+                  <div class="card-footer">
+                    <div class="card-stats">
+                      <span>1,234 calls today</span>
+                      <span>v2.1</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="intelligence-card">
+                  <div class="card-icon">🏷️</div>
+                  <div class="card-header">
+                    <div>
+                      <div class="card-title">SEO Meta Generator</div>
+                    </div>
+                    <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                  </div>
+                  <div class="card-desc">Creates SEO-optimized meta titles and descriptions for products.</div>
+                  <div class="card-footer">
+                    <div class="card-stats">
+                      <span>892 calls today</span>
+                      <span>v1.3</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: INTELLIGENCES LIST -->
+    <div class="screen" id="screen-intelligences">
+      <div class="screen-header">
+        <h2>Intelligences List</h2>
+        <p>Card gallery view of all intelligences with search and filters.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item active">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="page-header">
+              <div>
+                <h1 class="page-title">Intelligences</h1>
+                <p class="page-subtitle">12 intelligences created</p>
+              </div>
+              <button class="btn btn-primary">+ New Intelligence</button>
+            </div>
+            <div class="filter-bar">
+              <input type="text" class="search-input" placeholder="Search intelligences...">
+              <button class="filter-chip active">All</button>
+              <button class="filter-chip">Active</button>
+              <button class="filter-chip">Draft</button>
+            </div>
+            <div class="cards-grid cards-grid-3">
+              <div class="intelligence-card">
+                <div class="card-icon">📝</div>
+                <div class="card-header">
+                  <div><div class="card-title">Product Description API</div></div>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="card-desc">Generates compelling product descriptions from attributes.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>1,234 calls</span><span>v2.1</span></div>
+                </div>
+              </div>
+              <div class="intelligence-card">
+                <div class="card-icon">🏷️</div>
+                <div class="card-header">
+                  <div><div class="card-title">SEO Meta Generator</div></div>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="card-desc">Creates SEO-optimized meta titles and descriptions.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>892 calls</span><span>v1.3</span></div>
+                </div>
+              </div>
+              <div class="intelligence-card">
+                <div class="card-icon">📊</div>
+                <div class="card-header">
+                  <div><div class="card-title">Category Classifier</div></div>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="card-desc">Automatically categorizes products based on attributes.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>456 calls</span><span>v1.0</span></div>
+                </div>
+              </div>
+              <div class="intelligence-card">
+                <div class="card-icon">✨</div>
+                <div class="card-header">
+                  <div><div class="card-title">Feature Extractor</div></div>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="card-desc">Extracts key features from product specifications.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>234 calls</span><span>v1.2</span></div>
+                </div>
+              </div>
+              <div class="intelligence-card">
+                <div class="card-icon">🎯</div>
+                <div class="card-header">
+                  <div><div class="card-title">Audience Matcher</div></div>
+                  <span class="status-badge status-draft"><span class="status-dot"></span> Draft</span>
+                </div>
+                <div class="card-desc">Identifies target audience segments for products.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>—</span><span>v0.1</span></div>
+                </div>
+              </div>
+              <div class="intelligence-card">
+                <div class="card-icon">💰</div>
+                <div class="card-header">
+                  <div><div class="card-title">Price Optimizer</div></div>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="card-desc">Suggests optimal pricing based on market data.</div>
+                <div class="card-footer">
+                  <div class="card-stats"><span>178 calls</span><span>v1.1</span></div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: CREATE WIZARD -->
+    <div class="screen" id="screen-create">
+      <div class="screen-header">
+        <h2>Create Intelligence Wizard</h2>
+        <p>Step-by-step guided flow for creating a new intelligence.</p>
+      </div>
+      <div class="screen-content">
+        <div class="wizard-layout">
+          <header class="wizard-header">
+            <div class="wizard-logo">ProductIntel</div>
+            <div class="wizard-progress">
+              <div class="progress-step done">
+                <span class="step-number">✓</span>
+                <span>Template</span>
+              </div>
+              <div class="progress-line done"></div>
+              <div class="progress-step done">
+                <span class="step-number">✓</span>
+                <span>Basics</span>
+              </div>
+              <div class="progress-line done"></div>
+              <div class="progress-step active">
+                <span class="step-number">3</span>
+                <span>Input Schema</span>
+              </div>
+              <div class="progress-line"></div>
+              <div class="progress-step">
+                <span class="step-number">4</span>
+                <span>Goal</span>
+              </div>
+              <div class="progress-line"></div>
+              <div class="progress-step">
+                <span class="step-number">5</span>
+                <span>Output</span>
+              </div>
+              <div class="progress-line"></div>
+              <div class="progress-step">
+                <span class="step-number">6</span>
+                <span>Generate</span>
+              </div>
+            </div>
+            <button class="wizard-close">×</button>
+          </header>
+          <div class="wizard-content">
+            <div class="wizard-title">
+              <h1>Define Input Schema</h1>
+              <p>What product data will you send to this intelligence?</p>
+            </div>
+            <div class="wizard-form">
+              <div class="form-field">
+                <label class="form-label">Category</label>
+                <p class="form-hint">What type of products will this handle?</p>
+                <input type="text" class="form-input" value="Electronics">
+              </div>
+              <div class="form-field">
+                <label class="form-label">Attributes</label>
+                <p class="form-hint">What data fields will you provide?</p>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="form-input" value="product_name" style="flex: 1;">
+                    <select class="form-input" style="width: 120px;"><option>Text</option></select>
+                    <button class="btn btn-ghost" style="padding: 8px;">×</button>
+                  </div>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="form-input" value="brand" style="flex: 1;">
+                    <select class="form-input" style="width: 120px;"><option>Text</option></select>
+                    <button class="btn btn-ghost" style="padding: 8px;">×</button>
+                  </div>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="form-input" value="price" style="flex: 1;">
+                    <select class="form-input" style="width: 120px;"><option>Number</option></select>
+                    <button class="btn btn-ghost" style="padding: 8px;">×</button>
+                  </div>
+                  <button class="btn btn-ghost" style="align-self: flex-start;">+ Add attribute</button>
+                </div>
+              </div>
+              <div style="padding: 12px 16px; background: var(--bg-warm); border-radius: 8px; cursor: pointer; color: var(--text-secondary); font-size: 14px;">
+                ➕ Add more detail (components, subcategories)
+              </div>
+              <div class="wizard-actions">
+                <button class="btn btn-secondary">← Back</button>
+                <button class="btn btn-primary">Continue →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: INTELLIGENCE DETAIL -->
+    <div class="screen" id="screen-detail">
+      <div class="screen-header">
+        <h2>Intelligence Detail</h2>
+        <p>Detailed view of a single intelligence with endpoint info, schema, and quick actions.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item active">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="detail-header">
+              <div>
+                <div class="detail-title-row">
+                  <div class="detail-icon">📝</div>
+                  <h1 class="detail-title">Product Description API</h1>
+                  <span class="status-badge status-active"><span class="status-dot"></span> Active</span>
+                </div>
+                <div class="detail-meta">
+                  <span>Created Nov 15, 2025</span>
+                  <span>•</span>
+                  <span>Version 2.1</span>
+                  <span>•</span>
+                  <span>1,234 calls today</span>
+                </div>
+              </div>
+              <div class="detail-actions">
+                <button class="btn btn-secondary">Edit</button>
+                <button class="btn btn-primary">🧪 Test</button>
+              </div>
+            </div>
+            <div class="tabs">
+              <button class="tab active">Overview</button>
+              <button class="tab">Schema</button>
+              <button class="tab">Versions</button>
+              <button class="tab">Logs</button>
+            </div>
+            <div class="detail-grid">
+              <div>
+                <div class="detail-panel" style="margin-bottom: 24px;">
+                  <div class="panel-header">Endpoint</div>
+                  <div class="panel-content">
+                    <div class="endpoint-display">
+                      <span class="endpoint-method">POST</span>
+                      <span class="endpoint-url">https://api.productintel.io/v1/int_abc123xyz</span>
+                      <button class="copy-btn">📋</button>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                      <button class="btn btn-secondary" style="flex: 1;">View Documentation</button>
+                      <button class="btn btn-secondary" style="flex: 1;">Copy cURL</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-panel">
+                  <div class="panel-header">Description</div>
+                  <div class="panel-content">
+                    <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">
+                      Generates compelling product descriptions from attributes and specifications.
+                      The intelligence analyzes product name, brand, category, and key features to
+                      create engaging, SEO-friendly descriptions optimized for ecommerce.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="detail-panel" style="margin-bottom: 24px;">
+                  <div class="panel-header">Quick Stats</div>
+                  <div class="panel-content">
+                    <div class="info-row">
+                      <span class="info-label">Total Calls</span>
+                      <span class="info-value">45,231</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Success Rate</span>
+                      <span class="info-value">99.4%</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Avg Latency</span>
+                      <span class="info-value">1.1s</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Last Called</span>
+                      <span class="info-value">2 min ago</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-panel">
+                  <div class="panel-header">Input Schema</div>
+                  <div class="panel-content">
+                    <div class="info-row">
+                      <span class="info-label">product_name</span>
+                      <span class="info-value">string</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">brand</span>
+                      <span class="info-value">string</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">category</span>
+                      <span class="info-value">string</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">features</span>
+                      <span class="info-value">array</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 5: API TEST CONSOLE -->
+    <div class="screen" id="screen-console">
+      <div class="screen-header">
+        <h2>API Test Console</h2>
+        <p>In-browser testing with request/response panels and syntax highlighting.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item active">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="page-header">
+              <div>
+                <h1 class="page-title">Test: Product Description API</h1>
+                <p class="page-subtitle">Send a test request to your intelligence endpoint</p>
+              </div>
+              <button class="btn btn-secondary">← Back to Detail</button>
+            </div>
+            <div class="console-layout">
+              <div class="console-panel">
+                <div class="console-header">
+                  <span class="console-title">Request</span>
+                  <button class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px;">Reset</button>
+                </div>
+                <div class="console-body">
+<pre>{
+  <span class="json-key">"product_name"</span>: <span class="json-string">"Sony WH-1000XM5"</span>,
+  <span class="json-key">"brand"</span>: <span class="json-string">"Sony"</span>,
+  <span class="json-key">"category"</span>: <span class="json-string">"Electronics/Headphones"</span>,
+  <span class="json-key">"features"</span>: [
+    <span class="json-string">"Active Noise Cancellation"</span>,
+    <span class="json-string">"30-hour battery life"</span>,
+    <span class="json-string">"Multipoint connection"</span>,
+    <span class="json-string">"Hi-Res Audio certified"</span>
+  ],
+  <span class="json-key">"price"</span>: <span class="json-number">399.99</span>
+}</pre>
+                </div>
+                <div class="console-footer">
+                  <div></div>
+                  <button class="btn btn-primary">Send Request →</button>
+                </div>
+              </div>
+              <div class="console-panel">
+                <div class="console-header">
+                  <span class="console-title">Response</span>
+                  <div class="response-status">
+                    <span class="status-code">200 OK</span>
+                  </div>
+                </div>
+                <div class="console-body">
+<pre>{
+  <span class="json-key">"description"</span>: <span class="json-string">"Experience audio perfection with
+the Sony WH-1000XM5 wireless headphones.
+Industry-leading Active Noise Cancellation
+lets you immerse yourself in crystal-clear
+Hi-Res Audio, while 30-hour battery life
+keeps the music playing all day. Seamlessly
+switch between devices with Multipoint
+connection technology."</span>,
+  <span class="json-key">"highlights"</span>: [
+    <span class="json-string">"Industry-leading noise cancellation"</span>,
+    <span class="json-string">"All-day 30-hour battery"</span>,
+    <span class="json-string">"Hi-Res Audio certified sound"</span>
+  ],
+  <span class="json-key">"word_count"</span>: <span class="json-number">52</span>
+}</pre>
+                </div>
+                <div class="console-footer">
+                  <div class="latency-badge">
+                    Latency: <span class="latency-value">1.2s</span>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px;">Copy Response</button>
+                    <button class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px;">Copy cURL</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 6: LOGS -->
+    <div class="screen" id="screen-logs">
+      <div class="screen-header">
+        <h2>API Logs</h2>
+        <p>Call history with filtering, expandable details, and export options.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item active">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="page-header">
+              <div>
+                <h1 class="page-title">API Logs</h1>
+                <p class="page-subtitle">View and analyze your API call history</p>
+              </div>
+              <button class="btn btn-secondary">Export CSV</button>
+            </div>
+            <div class="logs-filters">
+              <input type="text" class="search-input" placeholder="Search logs...">
+              <input type="date" class="date-picker" value="2025-11-25">
+              <select class="date-picker">
+                <option>All Intelligences</option>
+                <option>Product Description API</option>
+                <option>SEO Meta Generator</option>
+              </select>
+              <button class="filter-chip active">All</button>
+              <button class="filter-chip">Success</button>
+              <button class="filter-chip">Errors</button>
+            </div>
+            <div class="logs-table">
+              <div class="table-header">
+                <span>Timestamp</span>
+                <span>Intelligence</span>
+                <span>Status</span>
+                <span>Latency</span>
+                <span></span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:34:12 PM</span>
+                <span class="log-intelligence">Product Description API</span>
+                <span><span class="log-status success">200 OK</span></span>
+                <span class="log-latency">1.1s</span>
+                <span class="log-expand">→</span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:33:58 PM</span>
+                <span class="log-intelligence">SEO Meta Generator</span>
+                <span><span class="log-status success">200 OK</span></span>
+                <span class="log-latency">0.9s</span>
+                <span class="log-expand">→</span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:33:45 PM</span>
+                <span class="log-intelligence">Product Description API</span>
+                <span><span class="log-status error">400 Error</span></span>
+                <span class="log-latency">0.2s</span>
+                <span class="log-expand">→</span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:33:21 PM</span>
+                <span class="log-intelligence">Category Classifier</span>
+                <span><span class="log-status success">200 OK</span></span>
+                <span class="log-latency">1.4s</span>
+                <span class="log-expand">→</span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:32:55 PM</span>
+                <span class="log-intelligence">Product Description API</span>
+                <span><span class="log-status success">200 OK</span></span>
+                <span class="log-latency">1.2s</span>
+                <span class="log-expand">→</span>
+              </div>
+              <div class="table-row">
+                <span class="log-time">Nov 25, 2:32:30 PM</span>
+                <span class="log-intelligence">Feature Extractor</span>
+                <span><span class="log-status success">200 OK</span></span>
+                <span class="log-latency">0.8s</span>
+                <span class="log-expand">→</span>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 7: SETTINGS -->
+    <div class="screen" id="screen-settings">
+      <div class="screen-header">
+        <h2>Settings</h2>
+        <p>Account settings, API keys, and billing management.</p>
+      </div>
+      <div class="screen-content">
+        <div class="app-layout">
+          <aside class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">PI</div>
+              <span class="logo-text">ProductIntel</span>
+            </div>
+            <nav class="sidebar-nav">
+              <div class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">🧠</span>
+                Intelligences
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📋</span>
+                Logs
+              </div>
+              <div class="nav-item">
+                <span class="nav-icon">📖</span>
+                Documentation
+              </div>
+              <div class="nav-item active">
+                <span class="nav-icon">⚙️</span>
+                Settings
+              </div>
+            </nav>
+            <div class="sidebar-footer">
+              <div class="user-info">
+                <div class="user-avatar">Z</div>
+                <div>
+                  <div class="user-name">Zac</div>
+                  <div class="user-plan">Growth Plan</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <main class="main-content">
+            <div class="page-header">
+              <div>
+                <h1 class="page-title">Settings</h1>
+                <p class="page-subtitle">Manage your account and preferences</p>
+              </div>
+            </div>
+            <div class="settings-layout">
+              <nav class="settings-nav">
+                <div class="settings-nav-item active">API Keys</div>
+                <div class="settings-nav-item">Usage & Billing</div>
+                <div class="settings-nav-item">Team</div>
+                <div class="settings-nav-item">Profile</div>
+                <div class="settings-nav-item">Notifications</div>
+              </nav>
+              <div class="settings-content">
+                <div class="settings-section">
+                  <h3 class="settings-section-title">Production API Key</h3>
+                  <p class="settings-section-desc">Use this key for production API calls. Keep it secret!</p>
+                  <div class="api-key-display">
+                    <span class="api-key-value">sk_prod_••••••••••••••••••••abc123</span>
+                    <div class="api-key-actions">
+                      <button class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px;">Show</button>
+                      <button class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px;">Copy</button>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary">Rotate Key</button>
+                    <button class="btn btn-secondary">Revoke</button>
+                  </div>
+                </div>
+                <div class="settings-section">
+                  <h3 class="settings-section-title">Sandbox API Key</h3>
+                  <p class="settings-section-desc">Use this key for testing. Calls don't count against your quota.</p>
+                  <div class="api-key-display">
+                    <span class="api-key-value">sk_test_••••••••••••••••••••xyz789</span>
+                    <div class="api-key-actions">
+                      <button class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px;">Show</button>
+                      <button class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px;">Copy</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="settings-section">
+                  <h3 class="settings-section-title">Monthly Usage</h3>
+                  <p class="settings-section-desc">Your API call usage for this billing period.</p>
+                  <div class="usage-bar">
+                    <div class="usage-fill" style="width: 45%;"></div>
+                  </div>
+                  <div class="usage-text">
+                    <span>2,250 / 5,000 calls used</span>
+                    <span>Resets Dec 1</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 8: SUCCESS STATE -->
+    <div class="screen" id="screen-success">
+      <div class="screen-header">
+        <h2>Success State</h2>
+        <p>Celebratory moment after generating a new intelligence API.</p>
+      </div>
+      <div class="screen-content">
+        <div class="success-layout">
+          <div class="success-icon">🎉</div>
+          <h1 class="success-title">Your API is Ready!</h1>
+          <p class="success-message">
+            Congratulations! You just created an AI-powered API endpoint.
+            Test it now or start integrating into your systems.
+          </p>
+          <div class="success-endpoint">
+            <div class="success-endpoint-label">Your Endpoint</div>
+            <div class="success-endpoint-url">https://api.productintel.io/v1/int_abc123xyz</div>
+          </div>
+          <div class="success-actions">
+            <button class="btn btn-primary">🧪 Test Now</button>
+            <button class="btn btn-secondary">📖 View Documentation</button>
+            <button class="btn btn-ghost">Go to Dashboard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll('.screen-tab');
+    const screens = document.querySelectorAll('.screen');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const screenId = tab.dataset.screen;
+
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        screens.forEach(s => s.classList.remove('active'));
+        document.getElementById(`screen-${screenId}`).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

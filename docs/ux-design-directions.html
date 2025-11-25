@@ -1,0 +1,2011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Intelligence Layer - Design Directions</title>
+  <style>
+    :root {
+      --primary: #f97316;
+      --primary-light: #fb923c;
+      --primary-dark: #ea580c;
+      --secondary: #78716c;
+      --accent: #eab308;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #dc2626;
+      --bg-warm: #fffbeb;
+      --bg-white: #ffffff;
+      --border: #fef3c7;
+      --border-neutral: #e7e5e4;
+      --text-primary: #1c1917;
+      --text-secondary: #57534e;
+      --text-muted: #a8a29e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f4;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* Navigation */
+    .nav {
+      background: white;
+      border-bottom: 1px solid var(--border-neutral);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .nav h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .nav-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .nav-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid var(--border-neutral);
+      background: white;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .nav-btn:hover {
+      background: #fafaf9;
+    }
+
+    .nav-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .direction-indicator {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* Direction Container */
+    .directions-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+
+    .direction {
+      display: none;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    .direction.active {
+      display: block;
+    }
+
+    .direction-header {
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border-neutral);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .direction-info h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .direction-number {
+      background: var(--primary);
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .direction-meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 12px;
+    }
+
+    .meta-item {
+      font-size: 13px;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    .meta-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .direction-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      padding: 4px 12px;
+      background: var(--bg-warm);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--primary-dark);
+    }
+
+    /* Mockup Frame */
+    .mockup-frame {
+      background: #e7e5e4;
+      padding: 24px;
+    }
+
+    .browser-chrome {
+      background: #fafaf9;
+      border-radius: 12px 12px 0 0;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-neutral);
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .browser-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #d6d3d1;
+    }
+
+    .browser-dot.red { background: #fca5a5; }
+    .browser-dot.yellow { background: #fde047; }
+    .browser-dot.green { background: #86efac; }
+
+    .browser-url {
+      flex: 1;
+      background: white;
+      border: 1px solid var(--border-neutral);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .mockup-content {
+      background: var(--bg-warm);
+      min-height: 600px;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+    }
+
+    /* ==================== */
+    /* DIRECTION 1: Spacious Dashboard */
+    /* ==================== */
+    .d1-layout {
+      display: flex;
+      min-height: 600px;
+    }
+
+    .d1-sidebar {
+      width: 240px;
+      background: white;
+      border-right: 1px solid var(--border-neutral);
+      padding: 24px 0;
+    }
+
+    .d1-logo {
+      padding: 0 20px 24px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .d1-logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-radius: 8px;
+    }
+
+    .d1-nav-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .d1-nav-item:hover {
+      background: var(--bg-warm);
+      color: var(--text-primary);
+    }
+
+    .d1-nav-item.active {
+      background: var(--bg-warm);
+      color: var(--primary);
+      border-right: 3px solid var(--primary);
+      font-weight: 500;
+    }
+
+    .d1-nav-icon {
+      width: 20px;
+      height: 20px;
+      background: currentColor;
+      border-radius: 4px;
+      opacity: 0.6;
+    }
+
+    .d1-main {
+      flex: 1;
+      padding: 32px;
+      overflow: auto;
+    }
+
+    .d1-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .d1-greeting h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .d1-greeting p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .d1-btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+      transition: all 0.15s;
+    }
+
+    .d1-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+    }
+
+    .d1-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .d1-stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border-neutral);
+    }
+
+    .d1-stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .d1-stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .d1-stat-change {
+      font-size: 12px;
+      color: var(--success);
+      margin-top: 4px;
+    }
+
+    .d1-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .d1-section-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .d1-link {
+      font-size: 13px;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    .d1-intelligence-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .d1-intelligence-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border-neutral);
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+
+    .d1-intelligence-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1);
+    }
+
+    .d1-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .d1-card-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .d1-card-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .d1-status {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .d1-card-footer {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-neutral);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ==================== */
+    /* DIRECTION 2: Compact Dashboard */
+    /* ==================== */
+    .d2-layout {
+      min-height: 600px;
+      background: white;
+    }
+
+    .d2-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border-neutral);
+      background: white;
+    }
+
+    .d2-logo {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .d2-logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      border-radius: 6px;
+    }
+
+    .d2-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    .d2-nav-item {
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .d2-nav-item:hover {
+      background: #fafaf9;
+    }
+
+    .d2-nav-item.active {
+      background: var(--bg-warm);
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .d2-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .d2-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--border-neutral);
+      background: white;
+      cursor: pointer;
+    }
+
+    .d2-btn-primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .d2-content {
+      display: flex;
+    }
+
+    .d2-main {
+      flex: 1;
+      padding: 20px 24px;
+    }
+
+    .d2-sidebar-right {
+      width: 280px;
+      background: #fafaf9;
+      border-left: 1px solid var(--border-neutral);
+      padding: 20px;
+    }
+
+    .d2-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .d2-page-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .d2-filters {
+      display: flex;
+      gap: 8px;
+    }
+
+    .d2-filter {
+      padding: 6px 12px;
+      background: white;
+      border: 1px solid var(--border-neutral);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .d2-filter.active {
+      background: var(--text-primary);
+      color: white;
+      border-color: var(--text-primary);
+    }
+
+    .d2-table {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid var(--border-neutral);
+      overflow: hidden;
+    }
+
+    .d2-table-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 80px;
+      padding: 12px 16px;
+      background: #fafaf9;
+      border-bottom: 1px solid var(--border-neutral);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .d2-table-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 80px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-neutral);
+      align-items: center;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .d2-table-row:hover {
+      background: var(--bg-warm);
+    }
+
+    .d2-table-row:last-child {
+      border-bottom: none;
+    }
+
+    .d2-name-cell {
+      font-weight: 500;
+    }
+
+    .d2-status-badge {
+      display: inline-flex;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .d2-status-active {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .d2-status-draft {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .d2-actions-cell {
+      display: flex;
+      gap: 8px;
+    }
+
+    .d2-icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      border: 1px solid var(--border-neutral);
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .d2-widget {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border-neutral);
+    }
+
+    .d2-widget-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .d2-mini-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-neutral);
+      font-size: 13px;
+    }
+
+    .d2-mini-stat:last-child {
+      border-bottom: none;
+    }
+
+    .d2-mini-value {
+      font-weight: 600;
+    }
+
+    /* ==================== */
+    /* DIRECTION 3: Card-Focused */
+    /* ==================== */
+    .d3-layout {
+      min-height: 600px;
+      background: var(--bg-warm);
+    }
+
+    .d3-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 32px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .d3-logo {
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--primary);
+    }
+
+    .d3-search {
+      flex: 1;
+      max-width: 400px;
+      margin: 0 32px;
+      position: relative;
+    }
+
+    .d3-search input {
+      width: 100%;
+      padding: 10px 16px 10px 40px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      background: var(--bg-warm);
+    }
+
+    .d3-search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .d3-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .d3-avatar {
+      width: 36px;
+      height: 36px;
+      background: var(--primary);
+      border-radius: 50%;
+    }
+
+    .d3-content {
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .d3-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .d3-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .d3-header p {
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+
+    .d3-quick-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .d3-quick-btn {
+      padding: 16px 32px;
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .d3-quick-btn:hover {
+      border-color: var(--primary);
+      background: white;
+    }
+
+    .d3-quick-btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    }
+
+    .d3-quick-btn.primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .d3-section-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .d3-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .d3-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .d3-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+    }
+
+    .d3-card-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg-warm);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .d3-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .d3-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .d3-card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .d3-card-status {
+      padding: 4px 10px;
+      background: #dcfce7;
+      color: #166534;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    /* ==================== */
+    /* DIRECTION 4: Minimal */
+    /* ==================== */
+    .d4-layout {
+      min-height: 600px;
+      background: white;
+    }
+
+    .d4-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      border-bottom: 1px solid #f5f5f4;
+    }
+
+    .d4-logo {
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--text-primary);
+    }
+
+    .d4-logo span {
+      color: var(--primary);
+    }
+
+    .d4-nav {
+      display: flex;
+      gap: 32px;
+    }
+
+    .d4-nav-item {
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding-bottom: 4px;
+    }
+
+    .d4-nav-item:hover {
+      color: var(--text-primary);
+    }
+
+    .d4-nav-item.active {
+      color: var(--text-primary);
+      font-weight: 500;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .d4-content {
+      padding: 60px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .d4-header {
+      margin-bottom: 48px;
+    }
+
+    .d4-header h1 {
+      font-size: 36px;
+      font-weight: 300;
+      margin-bottom: 12px;
+    }
+
+    .d4-header h1 strong {
+      font-weight: 700;
+    }
+
+    .d4-header p {
+      font-size: 18px;
+      color: var(--text-secondary);
+    }
+
+    .d4-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: var(--text-primary);
+      color: white;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 15px;
+      cursor: pointer;
+      margin-bottom: 60px;
+      transition: all 0.15s;
+    }
+
+    .d4-cta:hover {
+      background: var(--primary);
+    }
+
+    .d4-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .d4-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    .d4-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: #f5f5f4;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .d4-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: white;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .d4-list-item:hover {
+      background: var(--bg-warm);
+    }
+
+    .d4-item-info h3 {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .d4-item-info p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .d4-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .d4-item-status {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+    }
+
+    .d4-arrow {
+      color: var(--text-muted);
+    }
+
+    /* ==================== */
+    /* DIRECTION 5: Dashboard Dense */
+    /* ==================== */
+    .d5-layout {
+      display: flex;
+      min-height: 600px;
+      background: #1c1917;
+    }
+
+    .d5-sidebar {
+      width: 64px;
+      background: #0c0a09;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+    }
+
+    .d5-logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border-radius: 10px;
+      margin-bottom: 32px;
+    }
+
+    .d5-nav-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #57534e;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: all 0.15s;
+    }
+
+    .d5-nav-icon:hover {
+      background: #292524;
+      color: #a8a29e;
+    }
+
+    .d5-nav-icon.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .d5-main {
+      flex: 1;
+      padding: 24px;
+      overflow: auto;
+    }
+
+    .d5-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .d5-title {
+      color: white;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .d5-btn {
+      padding: 10px 20px;
+      background: var(--primary);
+      color: white;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .d5-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .d5-stat {
+      background: #292524;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .d5-stat-label {
+      font-size: 12px;
+      color: #78716c;
+      margin-bottom: 8px;
+    }
+
+    .d5-stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .d5-stat-trend {
+      font-size: 12px;
+      color: var(--success);
+      margin-top: 4px;
+    }
+
+    .d5-panel {
+      background: #292524;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .d5-panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #3f3f46;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .d5-panel-title {
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .d5-panel-link {
+      color: var(--primary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .d5-table-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      padding: 14px 20px;
+      border-bottom: 1px solid #3f3f46;
+      color: #a8a29e;
+      font-size: 13px;
+    }
+
+    .d5-table-row:last-child {
+      border-bottom: none;
+    }
+
+    .d5-table-name {
+      color: white;
+      font-weight: 500;
+    }
+
+    .d5-status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    /* ==================== */
+    /* DIRECTION 6: Wizard/Guided */
+    /* ==================== */
+    .d6-layout {
+      min-height: 600px;
+      background: linear-gradient(180deg, var(--bg-warm) 0%, white 100%);
+    }
+
+    .d6-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 32px;
+    }
+
+    .d6-logo {
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--primary);
+    }
+
+    .d6-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .d6-progress-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .d6-progress-step.active {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .d6-progress-step.done {
+      color: var(--success);
+    }
+
+    .d6-step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e7e5e4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .d6-progress-step.active .d6-step-number {
+      background: var(--primary);
+      color: white;
+    }
+
+    .d6-progress-step.done .d6-step-number {
+      background: var(--success);
+      color: white;
+    }
+
+    .d6-progress-line {
+      width: 40px;
+      height: 2px;
+      background: #e7e5e4;
+    }
+
+    .d6-progress-line.done {
+      background: var(--success);
+    }
+
+    .d6-close {
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 24px;
+    }
+
+    .d6-content {
+      max-width: 640px;
+      margin: 60px auto;
+      padding: 0 32px;
+    }
+
+    .d6-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .d6-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .d6-header p {
+      font-size: 16px;
+      color: var(--text-secondary);
+    }
+
+    .d6-form {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    }
+
+    .d6-field {
+      margin-bottom: 24px;
+    }
+
+    .d6-label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .d6-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .d6-input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      transition: border-color 0.15s;
+    }
+
+    .d6-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .d6-textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .d6-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 32px;
+    }
+
+    .d6-btn {
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .d6-btn-secondary {
+      background: white;
+      border: 2px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .d6-btn-primary {
+      background: var(--primary);
+      border: none;
+      color: white;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    }
+
+    .d6-btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .d1-stats { grid-template-columns: repeat(2, 1fr); }
+      .d1-intelligence-grid { grid-template-columns: 1fr; }
+      .d3-cards { grid-template-columns: 1fr; }
+      .d5-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <h1>Design Direction Explorer</h1>
+    <div class="nav-controls">
+      <button class="nav-btn active" data-dir="1">1</button>
+      <button class="nav-btn" data-dir="2">2</button>
+      <button class="nav-btn" data-dir="3">3</button>
+      <button class="nav-btn" data-dir="4">4</button>
+      <button class="nav-btn" data-dir="5">5</button>
+      <button class="nav-btn" data-dir="6">6</button>
+      <span class="direction-indicator">Direction <span id="current-dir">1</span> of 6</span>
+    </div>
+  </div>
+
+  <div class="directions-container">
+    <!-- Direction 1: Spacious Dashboard with Sidebar -->
+    <div class="direction active" id="dir-1">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">1</span> Spacious Dashboard</h2>
+          <p>Classic sidebar navigation with generous whitespace. Feels professional and organized.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Sidebar + Content</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Spacious</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Users who want clear navigation</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Professional</span>
+          <span class="tag">Organized</span>
+          <span class="tag">Familiar</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io/dashboard</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d1-layout">
+            <div class="d1-sidebar">
+              <div class="d1-logo">
+                <div class="d1-logo-icon"></div>
+                ProductIntel
+              </div>
+              <div class="d1-nav-item active">
+                <div class="d1-nav-icon"></div>
+                Dashboard
+              </div>
+              <div class="d1-nav-item">
+                <div class="d1-nav-icon"></div>
+                Intelligences
+              </div>
+              <div class="d1-nav-item">
+                <div class="d1-nav-icon"></div>
+                API Logs
+              </div>
+              <div class="d1-nav-item">
+                <div class="d1-nav-icon"></div>
+                Settings
+              </div>
+            </div>
+            <div class="d1-main">
+              <div class="d1-header">
+                <div class="d1-greeting">
+                  <h1>Welcome back, Zac</h1>
+                  <p>Here's what's happening with your intelligences today.</p>
+                </div>
+                <button class="d1-btn-primary">+ New Intelligence</button>
+              </div>
+              <div class="d1-stats">
+                <div class="d1-stat-card">
+                  <div class="d1-stat-label">Active Intelligences</div>
+                  <div class="d1-stat-value">12</div>
+                </div>
+                <div class="d1-stat-card">
+                  <div class="d1-stat-label">API Calls Today</div>
+                  <div class="d1-stat-value">2,847</div>
+                  <div class="d1-stat-change">+12% from yesterday</div>
+                </div>
+                <div class="d1-stat-card">
+                  <div class="d1-stat-label">Success Rate</div>
+                  <div class="d1-stat-value">99.2%</div>
+                </div>
+                <div class="d1-stat-card">
+                  <div class="d1-stat-label">Avg Response</div>
+                  <div class="d1-stat-value">1.2s</div>
+                </div>
+              </div>
+              <div class="d1-section-header">
+                <h2 class="d1-section-title">Recent Intelligences</h2>
+                <span class="d1-link">View all →</span>
+              </div>
+              <div class="d1-intelligence-grid">
+                <div class="d1-intelligence-card">
+                  <div class="d1-card-header">
+                    <div>
+                      <div class="d1-card-title">Product Description API</div>
+                      <div class="d1-card-desc">Generates product descriptions from attributes</div>
+                    </div>
+                    <span class="d1-status">Active</span>
+                  </div>
+                  <div class="d1-card-footer">
+                    <span>1,234 calls today</span>
+                    <span>v2.1</span>
+                  </div>
+                </div>
+                <div class="d1-intelligence-card">
+                  <div class="d1-card-header">
+                    <div>
+                      <div class="d1-card-title">SEO Meta Generator</div>
+                      <div class="d1-card-desc">Creates SEO-optimized meta tags</div>
+                    </div>
+                    <span class="d1-status">Active</span>
+                  </div>
+                  <div class="d1-card-footer">
+                    <span>892 calls today</span>
+                    <span>v1.3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction 2: Compact with Top Nav -->
+    <div class="direction" id="dir-2">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">2</span> Compact Table View</h2>
+          <p>Dense, data-focused layout with top navigation. Efficient for power users managing many intelligences.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Top Nav + Table</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Compact</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Power users, large catalogs</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Efficient</span>
+          <span class="tag">Data-Dense</span>
+          <span class="tag">Scannable</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io/intelligences</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d2-layout">
+            <div class="d2-topbar">
+              <div class="d2-logo">
+                <div class="d2-logo-icon"></div>
+                ProductIntel
+              </div>
+              <div class="d2-nav">
+                <span class="d2-nav-item">Dashboard</span>
+                <span class="d2-nav-item active">Intelligences</span>
+                <span class="d2-nav-item">Logs</span>
+                <span class="d2-nav-item">Docs</span>
+              </div>
+              <div class="d2-actions">
+                <button class="d2-btn">API Keys</button>
+                <button class="d2-btn d2-btn-primary">+ New</button>
+              </div>
+            </div>
+            <div class="d2-content">
+              <div class="d2-main">
+                <div class="d2-page-header">
+                  <h1 class="d2-page-title">Intelligences</h1>
+                  <div class="d2-filters">
+                    <span class="d2-filter active">All</span>
+                    <span class="d2-filter">Active</span>
+                    <span class="d2-filter">Draft</span>
+                  </div>
+                </div>
+                <div class="d2-table">
+                  <div class="d2-table-header">
+                    <span>Name</span>
+                    <span>Status</span>
+                    <span>Calls (24h)</span>
+                    <span>Version</span>
+                    <span>Actions</span>
+                  </div>
+                  <div class="d2-table-row">
+                    <span class="d2-name-cell">Product Description API</span>
+                    <span><span class="d2-status-badge d2-status-active">Active</span></span>
+                    <span>1,234</span>
+                    <span>v2.1</span>
+                    <span class="d2-actions-cell">
+                      <button class="d2-icon-btn">▶</button>
+                      <button class="d2-icon-btn">⚙</button>
+                    </span>
+                  </div>
+                  <div class="d2-table-row">
+                    <span class="d2-name-cell">SEO Meta Generator</span>
+                    <span><span class="d2-status-badge d2-status-active">Active</span></span>
+                    <span>892</span>
+                    <span>v1.3</span>
+                    <span class="d2-actions-cell">
+                      <button class="d2-icon-btn">▶</button>
+                      <button class="d2-icon-btn">⚙</button>
+                    </span>
+                  </div>
+                  <div class="d2-table-row">
+                    <span class="d2-name-cell">Attribute Enrichment</span>
+                    <span><span class="d2-status-badge d2-status-draft">Draft</span></span>
+                    <span>—</span>
+                    <span>v0.1</span>
+                    <span class="d2-actions-cell">
+                      <button class="d2-icon-btn">▶</button>
+                      <button class="d2-icon-btn">⚙</button>
+                    </span>
+                  </div>
+                  <div class="d2-table-row">
+                    <span class="d2-name-cell">Category Classifier</span>
+                    <span><span class="d2-status-badge d2-status-active">Active</span></span>
+                    <span>456</span>
+                    <span>v1.0</span>
+                    <span class="d2-actions-cell">
+                      <button class="d2-icon-btn">▶</button>
+                      <button class="d2-icon-btn">⚙</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="d2-sidebar-right">
+                <div class="d2-widget">
+                  <div class="d2-widget-title">Quick Stats</div>
+                  <div class="d2-mini-stat">
+                    <span>Total Calls Today</span>
+                    <span class="d2-mini-value">2,847</span>
+                  </div>
+                  <div class="d2-mini-stat">
+                    <span>Success Rate</span>
+                    <span class="d2-mini-value">99.2%</span>
+                  </div>
+                  <div class="d2-mini-stat">
+                    <span>Avg Latency</span>
+                    <span class="d2-mini-value">1.2s</span>
+                  </div>
+                </div>
+                <div class="d2-widget">
+                  <div class="d2-widget-title">Usage This Month</div>
+                  <div class="d2-mini-stat">
+                    <span>API Calls</span>
+                    <span class="d2-mini-value">45,231</span>
+                  </div>
+                  <div class="d2-mini-stat">
+                    <span>Plan Limit</span>
+                    <span class="d2-mini-value">100,000</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction 3: Card-Focused -->
+    <div class="direction" id="dir-3">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">3</span> Card Gallery</h2>
+          <p>Visual, card-based layout with prominent actions. Feels friendly and approachable.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Top Nav + Cards</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Spacious</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Visual thinkers, new users</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Friendly</span>
+          <span class="tag">Visual</span>
+          <span class="tag">Inviting</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d3-layout">
+            <div class="d3-topbar">
+              <div class="d3-logo">ProductIntel</div>
+              <div class="d3-search">
+                <span class="d3-search-icon">🔍</span>
+                <input type="text" placeholder="Search intelligences...">
+              </div>
+              <div class="d3-user">
+                <span>Zac</span>
+                <div class="d3-avatar"></div>
+              </div>
+            </div>
+            <div class="d3-content">
+              <div class="d3-header">
+                <h1>Your Intelligence Hub</h1>
+                <p>Create, manage, and monitor your AI-powered APIs</p>
+              </div>
+              <div class="d3-quick-actions">
+                <button class="d3-quick-btn primary">+ Create Intelligence</button>
+                <button class="d3-quick-btn">📖 Documentation</button>
+                <button class="d3-quick-btn">🔑 API Keys</button>
+              </div>
+              <h2 class="d3-section-title">Your Intelligences</h2>
+              <div class="d3-cards">
+                <div class="d3-card">
+                  <div class="d3-card-icon">📝</div>
+                  <h3>Product Description API</h3>
+                  <p>Generates compelling product descriptions from attributes and specifications.</p>
+                  <div class="d3-card-meta">
+                    <span>1,234 calls today</span>
+                    <span class="d3-card-status">Active</span>
+                  </div>
+                </div>
+                <div class="d3-card">
+                  <div class="d3-card-icon">🏷️</div>
+                  <h3>SEO Meta Generator</h3>
+                  <p>Creates SEO-optimized meta titles and descriptions.</p>
+                  <div class="d3-card-meta">
+                    <span>892 calls today</span>
+                    <span class="d3-card-status">Active</span>
+                  </div>
+                </div>
+                <div class="d3-card">
+                  <div class="d3-card-icon">📊</div>
+                  <h3>Category Classifier</h3>
+                  <p>Automatically categorizes products based on attributes.</p>
+                  <div class="d3-card-meta">
+                    <span>456 calls today</span>
+                    <span class="d3-card-status">Active</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction 4: Minimal -->
+    <div class="direction" id="dir-4">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">4</span> Minimal List</h2>
+          <p>Ultra-clean, content-focused design. Maximum whitespace, zero distractions.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Centered Content</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Very Spacious</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Calm focus, premium feel</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Minimal</span>
+          <span class="tag">Premium</span>
+          <span class="tag">Focused</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d4-layout">
+            <div class="d4-topbar">
+              <div class="d4-logo">Product<span>Intel</span></div>
+              <div class="d4-nav">
+                <span class="d4-nav-item active">Intelligences</span>
+                <span class="d4-nav-item">Logs</span>
+                <span class="d4-nav-item">Settings</span>
+              </div>
+            </div>
+            <div class="d4-content">
+              <div class="d4-header">
+                <h1>Your <strong>Intelligences</strong></h1>
+                <p>12 active endpoints ready to use</p>
+              </div>
+              <div class="d4-cta">+ Create new intelligence</div>
+              <div class="d4-section-header">
+                <span class="d4-section-title">All Intelligences</span>
+              </div>
+              <div class="d4-list">
+                <div class="d4-list-item">
+                  <div class="d4-item-info">
+                    <h3>Product Description API</h3>
+                    <p>Generates descriptions from product attributes</p>
+                  </div>
+                  <div class="d4-item-meta">
+                    <span>1,234 calls</span>
+                    <span>v2.1</span>
+                    <span class="d4-item-status"></span>
+                    <span class="d4-arrow">→</span>
+                  </div>
+                </div>
+                <div class="d4-list-item">
+                  <div class="d4-item-info">
+                    <h3>SEO Meta Generator</h3>
+                    <p>Creates SEO-optimized meta tags</p>
+                  </div>
+                  <div class="d4-item-meta">
+                    <span>892 calls</span>
+                    <span>v1.3</span>
+                    <span class="d4-item-status"></span>
+                    <span class="d4-arrow">→</span>
+                  </div>
+                </div>
+                <div class="d4-list-item">
+                  <div class="d4-item-info">
+                    <h3>Category Classifier</h3>
+                    <p>Auto-categorizes products</p>
+                  </div>
+                  <div class="d4-item-meta">
+                    <span>456 calls</span>
+                    <span>v1.0</span>
+                    <span class="d4-item-status"></span>
+                    <span class="d4-arrow">→</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction 5: Dark Dashboard -->
+    <div class="direction" id="dir-5">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">5</span> Dark Mode Dashboard</h2>
+          <p>Modern dark theme with icon-based navigation. Feels technical and powerful.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Icon Sidebar</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Balanced</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Developers, technical users</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Technical</span>
+          <span class="tag">Modern</span>
+          <span class="tag">Powerful</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io/dashboard</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d5-layout">
+            <div class="d5-sidebar">
+              <div class="d5-logo-icon"></div>
+              <div class="d5-nav-icon active">📊</div>
+              <div class="d5-nav-icon">🧠</div>
+              <div class="d5-nav-icon">📋</div>
+              <div class="d5-nav-icon">⚙️</div>
+            </div>
+            <div class="d5-main">
+              <div class="d5-header">
+                <h1 class="d5-title">Dashboard</h1>
+                <button class="d5-btn">+ New Intelligence</button>
+              </div>
+              <div class="d5-grid">
+                <div class="d5-stat">
+                  <div class="d5-stat-label">Active Intelligences</div>
+                  <div class="d5-stat-value">12</div>
+                </div>
+                <div class="d5-stat">
+                  <div class="d5-stat-label">API Calls Today</div>
+                  <div class="d5-stat-value">2,847</div>
+                  <div class="d5-stat-trend">↑ 12%</div>
+                </div>
+                <div class="d5-stat">
+                  <div class="d5-stat-label">Success Rate</div>
+                  <div class="d5-stat-value">99.2%</div>
+                </div>
+                <div class="d5-stat">
+                  <div class="d5-stat-label">Avg Response</div>
+                  <div class="d5-stat-value">1.2s</div>
+                </div>
+              </div>
+              <div class="d5-panel">
+                <div class="d5-panel-header">
+                  <span class="d5-panel-title">Recent Intelligences</span>
+                  <span class="d5-panel-link">View all →</span>
+                </div>
+                <div class="d5-table-row">
+                  <span class="d5-table-name">Product Description API</span>
+                  <span><span class="d5-status-dot"></span>Active</span>
+                  <span>1,234 calls</span>
+                  <span>v2.1</span>
+                </div>
+                <div class="d5-table-row">
+                  <span class="d5-table-name">SEO Meta Generator</span>
+                  <span><span class="d5-status-dot"></span>Active</span>
+                  <span>892 calls</span>
+                  <span>v1.3</span>
+                </div>
+                <div class="d5-table-row">
+                  <span class="d5-table-name">Category Classifier</span>
+                  <span><span class="d5-status-dot"></span>Active</span>
+                  <span>456 calls</span>
+                  <span>v1.0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direction 6: Wizard/Guided -->
+    <div class="direction" id="dir-6">
+      <div class="direction-header">
+        <div class="direction-info">
+          <h2><span class="direction-number">6</span> Guided Wizard</h2>
+          <p>Step-by-step creation flow. Perfect for the "Create Intelligence" experience.</p>
+          <div class="direction-meta">
+            <span class="meta-item"><span class="meta-label">Layout:</span><span class="meta-value">Centered Wizard</span></span>
+            <span class="meta-item"><span class="meta-label">Density:</span><span class="meta-value">Focused</span></span>
+            <span class="meta-item"><span class="meta-label">Best for:</span><span class="meta-value">Onboarding, complex creation</span></span>
+          </div>
+        </div>
+        <div class="direction-tags">
+          <span class="tag">Guided</span>
+          <span class="tag">Approachable</span>
+          <span class="tag">Step-by-Step</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="browser-dot red"></span>
+            <span class="browser-dot yellow"></span>
+            <span class="browser-dot green"></span>
+          </div>
+          <div class="browser-url">app.productintel.io/create</div>
+        </div>
+        <div class="mockup-content">
+          <div class="d6-layout">
+            <div class="d6-topbar">
+              <div class="d6-logo">ProductIntel</div>
+              <div class="d6-progress">
+                <div class="d6-progress-step done">
+                  <span class="d6-step-number">✓</span>
+                  <span>Basics</span>
+                </div>
+                <div class="d6-progress-line done"></div>
+                <div class="d6-progress-step active">
+                  <span class="d6-step-number">2</span>
+                  <span>Define Input</span>
+                </div>
+                <div class="d6-progress-line"></div>
+                <div class="d6-progress-step">
+                  <span class="d6-step-number">3</span>
+                  <span>Set Goal</span>
+                </div>
+                <div class="d6-progress-line"></div>
+                <div class="d6-progress-step">
+                  <span class="d6-step-number">4</span>
+                  <span>Generate</span>
+                </div>
+              </div>
+              <span class="d6-close">×</span>
+            </div>
+            <div class="d6-content">
+              <div class="d6-header">
+                <h1>Define Your Input Schema</h1>
+                <p>What product data will you send to this intelligence?</p>
+              </div>
+              <div class="d6-form">
+                <div class="d6-field">
+                  <label class="d6-label">Product Category</label>
+                  <p class="d6-hint">What type of products will this intelligence handle?</p>
+                  <input type="text" class="d6-input" placeholder="e.g., Electronics, Clothing, Home Goods">
+                </div>
+                <div class="d6-field">
+                  <label class="d6-label">Required Attributes</label>
+                  <p class="d6-hint">What data fields will you always provide?</p>
+                  <textarea class="d6-textarea" placeholder="e.g., product_name, brand, price, specifications..."></textarea>
+                </div>
+                <div class="d6-actions">
+                  <button class="d6-btn d6-btn-secondary">← Back</button>
+                  <button class="d6-btn d6-btn-primary">Continue →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const buttons = document.querySelectorAll('.nav-btn');
+    const directions = document.querySelectorAll('.direction');
+    const indicator = document.getElementById('current-dir');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.dataset.dir;
+
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        directions.forEach(d => d.classList.remove('active'));
+        document.getElementById(`dir-${dir}`).classList.add('active');
+
+        indicator.textContent = dir;
+      });
+    });
+  </script>
+</body>
+</html>

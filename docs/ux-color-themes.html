@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Intelligence Layer - Color Theme Explorer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    .header {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 24px 40px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .themes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+      padding: 40px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1200px) {
+      .themes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .theme-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .theme-header {
+      padding: 24px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .theme-number {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      text-align: center;
+      line-height: 28px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-right: 12px;
+    }
+
+    .theme-name {
+      font-size: 20px;
+      font-weight: 600;
+      display: inline;
+    }
+
+    .theme-personality {
+      margin-top: 8px;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .theme-best-for {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Color Palette Section */
+    .palette-section {
+      padding: 24px;
+      background: #f8fafc;
+    }
+
+    .palette-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .palette-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .color-swatch {
+      flex: 1;
+      height: 60px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .color-swatch .label {
+      opacity: 0.9;
+    }
+
+    .color-swatch .hex {
+      font-family: monospace;
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .palette-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    /* Component Preview Section */
+    .components-section {
+      padding: 24px;
+    }
+
+    .component-row {
+      margin-bottom: 20px;
+    }
+
+    .component-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .component-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+
+    .buttons-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .input-preview {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .input-field {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      border: 1px solid #e2e8f0;
+      background: white;
+      outline: none;
+    }
+
+    .card-preview {
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .card-preview h4 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .card-preview p {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+
+    .card-preview .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .card-preview .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .alerts-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .alert-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    /* Theme 1: Professional Blue */
+    .theme-1 .primary { background: #2563eb; color: white; }
+    .theme-1 .primary-light { background: #3b82f6; color: white; }
+    .theme-1 .secondary { background: #64748b; color: white; }
+    .theme-1 .accent { background: #0ea5e9; color: white; }
+    .theme-1 .success { background: #10b981; color: white; }
+    .theme-1 .warning { background: #f59e0b; color: white; }
+    .theme-1 .error { background: #ef4444; color: white; }
+    .theme-1 .neutral-1 { background: #f8fafc; color: #1e293b; }
+    .theme-1 .neutral-2 { background: #e2e8f0; color: #1e293b; }
+    .theme-1 .neutral-3 { background: #1e293b; color: white; }
+
+    .theme-1 .btn-primary { background: #2563eb; color: white; }
+    .theme-1 .btn-primary:hover { background: #1d4ed8; }
+    .theme-1 .btn-secondary { background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0; }
+    .theme-1 .btn-secondary:hover { background: #e2e8f0; }
+    .theme-1 .btn-ghost { background: transparent; color: #2563eb; }
+    .theme-1 .btn-ghost:hover { background: #eff6ff; }
+
+    .theme-1 .input-field:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+    .theme-1 .card-preview { background: white; }
+    .theme-1 .card-preview .status { background: #ecfdf5; color: #059669; }
+    .theme-1 .card-preview .status-dot { background: #10b981; }
+
+    .theme-1 .alert-success { background: #ecfdf5; color: #065f46; }
+    .theme-1 .alert-success .alert-icon { background: #10b981; color: white; }
+    .theme-1 .alert-error { background: #fef2f2; color: #991b1b; }
+    .theme-1 .alert-error .alert-icon { background: #ef4444; color: white; }
+
+    /* Theme 2: Vibrant Indigo */
+    .theme-2 .primary { background: #6366f1; color: white; }
+    .theme-2 .primary-light { background: #818cf8; color: white; }
+    .theme-2 .secondary { background: #8b5cf6; color: white; }
+    .theme-2 .accent { background: #ec4899; color: white; }
+    .theme-2 .success { background: #22c55e; color: white; }
+    .theme-2 .warning { background: #eab308; color: #1e293b; }
+    .theme-2 .error { background: #f43f5e; color: white; }
+    .theme-2 .neutral-1 { background: #faf5ff; color: #1e293b; }
+    .theme-2 .neutral-2 { background: #e9d5ff; color: #1e293b; }
+    .theme-2 .neutral-3 { background: #1e1b4b; color: white; }
+
+    .theme-2 .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
+    .theme-2 .btn-primary:hover { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+    .theme-2 .btn-secondary { background: #f5f3ff; color: #6366f1; border: 1px solid #e9d5ff; }
+    .theme-2 .btn-secondary:hover { background: #ede9fe; }
+    .theme-2 .btn-ghost { background: transparent; color: #6366f1; }
+    .theme-2 .btn-ghost:hover { background: #f5f3ff; }
+
+    .theme-2 .input-field:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+
+    .theme-2 .card-preview { background: white; }
+    .theme-2 .card-preview .status { background: #f0fdf4; color: #15803d; }
+    .theme-2 .card-preview .status-dot { background: #22c55e; }
+
+    .theme-2 .alert-success { background: #f0fdf4; color: #166534; }
+    .theme-2 .alert-success .alert-icon { background: #22c55e; color: white; }
+    .theme-2 .alert-error { background: #fff1f2; color: #9f1239; }
+    .theme-2 .alert-error .alert-icon { background: #f43f5e; color: white; }
+
+    /* Theme 3: Calm Teal */
+    .theme-3 .primary { background: #0d9488; color: white; }
+    .theme-3 .primary-light { background: #14b8a6; color: white; }
+    .theme-3 .secondary { background: #64748b; color: white; }
+    .theme-3 .accent { background: #06b6d4; color: white; }
+    .theme-3 .success { background: #22c55e; color: white; }
+    .theme-3 .warning { background: #f59e0b; color: white; }
+    .theme-3 .error { background: #ef4444; color: white; }
+    .theme-3 .neutral-1 { background: #f0fdfa; color: #134e4a; }
+    .theme-3 .neutral-2 { background: #ccfbf1; color: #134e4a; }
+    .theme-3 .neutral-3 { background: #134e4a; color: white; }
+
+    .theme-3 .btn-primary { background: #0d9488; color: white; }
+    .theme-3 .btn-primary:hover { background: #0f766e; }
+    .theme-3 .btn-secondary { background: #f0fdfa; color: #0d9488; border: 1px solid #99f6e4; }
+    .theme-3 .btn-secondary:hover { background: #ccfbf1; }
+    .theme-3 .btn-ghost { background: transparent; color: #0d9488; }
+    .theme-3 .btn-ghost:hover { background: #f0fdfa; }
+
+    .theme-3 .input-field:focus { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
+
+    .theme-3 .card-preview { background: white; }
+    .theme-3 .card-preview .status { background: #f0fdf4; color: #15803d; }
+    .theme-3 .card-preview .status-dot { background: #22c55e; }
+
+    .theme-3 .alert-success { background: #f0fdf4; color: #166534; }
+    .theme-3 .alert-success .alert-icon { background: #22c55e; color: white; }
+    .theme-3 .alert-error { background: #fef2f2; color: #991b1b; }
+    .theme-3 .alert-error .alert-icon { background: #ef4444; color: white; }
+
+    /* Theme 4: Warm Coral */
+    .theme-4 .primary { background: #f97316; color: white; }
+    .theme-4 .primary-light { background: #fb923c; color: white; }
+    .theme-4 .secondary { background: #78716c; color: white; }
+    .theme-4 .accent { background: #eab308; color: #1e293b; }
+    .theme-4 .success { background: #22c55e; color: white; }
+    .theme-4 .warning { background: #f59e0b; color: white; }
+    .theme-4 .error { background: #dc2626; color: white; }
+    .theme-4 .neutral-1 { background: #fffbeb; color: #1c1917; }
+    .theme-4 .neutral-2 { background: #fef3c7; color: #1c1917; }
+    .theme-4 .neutral-3 { background: #1c1917; color: white; }
+
+    .theme-4 .btn-primary { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; }
+    .theme-4 .btn-primary:hover { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); }
+    .theme-4 .btn-secondary { background: #fffbeb; color: #c2410c; border: 1px solid #fed7aa; }
+    .theme-4 .btn-secondary:hover { background: #fef3c7; }
+    .theme-4 .btn-ghost { background: transparent; color: #f97316; }
+    .theme-4 .btn-ghost:hover { background: #fff7ed; }
+
+    .theme-4 .input-field:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1); }
+
+    .theme-4 .card-preview { background: white; }
+    .theme-4 .card-preview .status { background: #f0fdf4; color: #15803d; }
+    .theme-4 .card-preview .status-dot { background: #22c55e; }
+
+    .theme-4 .alert-success { background: #f0fdf4; color: #166534; }
+    .theme-4 .alert-success .alert-icon { background: #22c55e; color: white; }
+    .theme-4 .alert-error { background: #fef2f2; color: #991b1b; }
+    .theme-4 .alert-error .alert-icon { background: #dc2626; color: white; }
+
+    /* Dark mode toggle area */
+    .dark-mode-note {
+      text-align: center;
+      padding: 24px;
+      color: #64748b;
+      font-size: 13px;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Product Intelligence Layer - Color Theme Explorer</h1>
+    <p>Compare 4 theme directions based on your product personality: Empowering, Trustworthy, Simple</p>
+  </div>
+
+  <div class="themes-grid">
+    <!-- Theme 1: Professional Blue -->
+    <div class="theme-card theme-1">
+      <div class="theme-header">
+        <span class="theme-number">1</span>
+        <h2 class="theme-name">Professional Blue</h2>
+        <p class="theme-personality"><strong>Personality:</strong> Trustworthy, Reliable, Enterprise-Ready</p>
+        <p class="theme-best-for"><strong>Best for:</strong> B2B SaaS, appeals to enterprise buyers, safe and credible</p>
+      </div>
+
+      <div class="palette-section">
+        <div class="palette-label">Primary & Accent Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch primary"><span class="label">Primary</span><span class="hex">#2563eb</span></div>
+          <div class="color-swatch primary-light"><span class="label">Primary Light</span><span class="hex">#3b82f6</span></div>
+          <div class="color-swatch secondary"><span class="label">Secondary</span><span class="hex">#64748b</span></div>
+          <div class="color-swatch accent"><span class="label">Accent</span><span class="hex">#0ea5e9</span></div>
+        </div>
+
+        <div class="palette-label">Semantic Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch success"><span class="label">Success</span><span class="hex">#10b981</span></div>
+          <div class="color-swatch warning"><span class="label">Warning</span><span class="hex">#f59e0b</span></div>
+          <div class="color-swatch error"><span class="label">Error</span><span class="hex">#ef4444</span></div>
+        </div>
+
+        <div class="palette-label">Neutrals</div>
+        <div class="palette-row">
+          <div class="color-swatch neutral-1"><span class="label">Background</span><span class="hex">#f8fafc</span></div>
+          <div class="color-swatch neutral-2"><span class="label">Border</span><span class="hex">#e2e8f0</span></div>
+          <div class="color-swatch neutral-3"><span class="label">Text</span><span class="hex">#1e293b</span></div>
+        </div>
+      </div>
+
+      <div class="components-section">
+        <div class="component-row">
+          <div class="component-label">Buttons</div>
+          <div class="buttons-row">
+            <button class="btn btn-primary">Generate API</button>
+            <button class="btn btn-secondary">Cancel</button>
+            <button class="btn btn-ghost">Learn More</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Form Input</div>
+          <div class="input-preview">
+            <input type="text" class="input-field" placeholder="Intelligence name..." value="Product Description Generator">
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Card Component</div>
+          <div class="card-preview">
+            <h4>Product Description API</h4>
+            <p>Generates compelling product descriptions from attributes and specifications.</p>
+            <span class="status"><span class="status-dot"></span> Active</span>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Alerts</div>
+          <div class="alerts-row">
+            <div class="alert alert-success">
+              <span class="alert-icon">✓</span>
+              Intelligence generated successfully! Your API is ready to use.
+            </div>
+            <div class="alert alert-error">
+              <span class="alert-icon">!</span>
+              Schema validation failed. Please check your output format.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme 2: Vibrant Indigo -->
+    <div class="theme-card theme-2">
+      <div class="theme-header">
+        <span class="theme-number">2</span>
+        <h2 class="theme-name">Vibrant Indigo</h2>
+        <p class="theme-personality"><strong>Personality:</strong> Innovative, Modern, Empowering</p>
+        <p class="theme-best-for"><strong>Best for:</strong> Standing out from competitors, feeling cutting-edge and AI-forward</p>
+      </div>
+
+      <div class="palette-section">
+        <div class="palette-label">Primary & Accent Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch primary"><span class="label">Primary</span><span class="hex">#6366f1</span></div>
+          <div class="color-swatch primary-light"><span class="label">Primary Light</span><span class="hex">#818cf8</span></div>
+          <div class="color-swatch secondary"><span class="label">Secondary</span><span class="hex">#8b5cf6</span></div>
+          <div class="color-swatch accent"><span class="label">Accent</span><span class="hex">#ec4899</span></div>
+        </div>
+
+        <div class="palette-label">Semantic Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch success"><span class="label">Success</span><span class="hex">#22c55e</span></div>
+          <div class="color-swatch warning"><span class="label">Warning</span><span class="hex">#eab308</span></div>
+          <div class="color-swatch error"><span class="label">Error</span><span class="hex">#f43f5e</span></div>
+        </div>
+
+        <div class="palette-label">Neutrals</div>
+        <div class="palette-row">
+          <div class="color-swatch neutral-1"><span class="label">Background</span><span class="hex">#faf5ff</span></div>
+          <div class="color-swatch neutral-2"><span class="label">Border</span><span class="hex">#e9d5ff</span></div>
+          <div class="color-swatch neutral-3"><span class="label">Text</span><span class="hex">#1e1b4b</span></div>
+        </div>
+      </div>
+
+      <div class="components-section">
+        <div class="component-row">
+          <div class="component-label">Buttons</div>
+          <div class="buttons-row">
+            <button class="btn btn-primary">Generate API</button>
+            <button class="btn btn-secondary">Cancel</button>
+            <button class="btn btn-ghost">Learn More</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Form Input</div>
+          <div class="input-preview">
+            <input type="text" class="input-field" placeholder="Intelligence name..." value="Product Description Generator">
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Card Component</div>
+          <div class="card-preview">
+            <h4>Product Description API</h4>
+            <p>Generates compelling product descriptions from attributes and specifications.</p>
+            <span class="status"><span class="status-dot"></span> Active</span>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Alerts</div>
+          <div class="alerts-row">
+            <div class="alert alert-success">
+              <span class="alert-icon">✓</span>
+              Intelligence generated successfully! Your API is ready to use.
+            </div>
+            <div class="alert alert-error">
+              <span class="alert-icon">!</span>
+              Schema validation failed. Please check your output format.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme 3: Calm Teal -->
+    <div class="theme-card theme-3">
+      <div class="theme-header">
+        <span class="theme-number">3</span>
+        <h2 class="theme-name">Calm Teal</h2>
+        <p class="theme-personality"><strong>Personality:</strong> Calm, Focused, Growth-Oriented</p>
+        <p class="theme-best-for"><strong>Best for:</strong> Reducing overwhelm, feeling approachable yet professional</p>
+      </div>
+
+      <div class="palette-section">
+        <div class="palette-label">Primary & Accent Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch primary"><span class="label">Primary</span><span class="hex">#0d9488</span></div>
+          <div class="color-swatch primary-light"><span class="label">Primary Light</span><span class="hex">#14b8a6</span></div>
+          <div class="color-swatch secondary"><span class="label">Secondary</span><span class="hex">#64748b</span></div>
+          <div class="color-swatch accent"><span class="label">Accent</span><span class="hex">#06b6d4</span></div>
+        </div>
+
+        <div class="palette-label">Semantic Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch success"><span class="label">Success</span><span class="hex">#22c55e</span></div>
+          <div class="color-swatch warning"><span class="label">Warning</span><span class="hex">#f59e0b</span></div>
+          <div class="color-swatch error"><span class="label">Error</span><span class="hex">#ef4444</span></div>
+        </div>
+
+        <div class="palette-label">Neutrals</div>
+        <div class="palette-row">
+          <div class="color-swatch neutral-1"><span class="label">Background</span><span class="hex">#f0fdfa</span></div>
+          <div class="color-swatch neutral-2"><span class="label">Border</span><span class="hex">#ccfbf1</span></div>
+          <div class="color-swatch neutral-3"><span class="label">Text</span><span class="hex">#134e4a</span></div>
+        </div>
+      </div>
+
+      <div class="components-section">
+        <div class="component-row">
+          <div class="component-label">Buttons</div>
+          <div class="buttons-row">
+            <button class="btn btn-primary">Generate API</button>
+            <button class="btn btn-secondary">Cancel</button>
+            <button class="btn btn-ghost">Learn More</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Form Input</div>
+          <div class="input-preview">
+            <input type="text" class="input-field" placeholder="Intelligence name..." value="Product Description Generator">
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Card Component</div>
+          <div class="card-preview">
+            <h4>Product Description API</h4>
+            <p>Generates compelling product descriptions from attributes and specifications.</p>
+            <span class="status"><span class="status-dot"></span> Active</span>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Alerts</div>
+          <div class="alerts-row">
+            <div class="alert alert-success">
+              <span class="alert-icon">✓</span>
+              Intelligence generated successfully! Your API is ready to use.
+            </div>
+            <div class="alert alert-error">
+              <span class="alert-icon">!</span>
+              Schema validation failed. Please check your output format.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme 4: Warm Coral -->
+    <div class="theme-card theme-4">
+      <div class="theme-header">
+        <span class="theme-number">4</span>
+        <h2 class="theme-name">Warm Coral</h2>
+        <p class="theme-personality"><strong>Personality:</strong> Energetic, Friendly, Approachable</p>
+        <p class="theme-best-for"><strong>Best for:</strong> Standing out boldly, feeling warm and human in a technical space</p>
+      </div>
+
+      <div class="palette-section">
+        <div class="palette-label">Primary & Accent Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch primary"><span class="label">Primary</span><span class="hex">#f97316</span></div>
+          <div class="color-swatch primary-light"><span class="label">Primary Light</span><span class="hex">#fb923c</span></div>
+          <div class="color-swatch secondary"><span class="label">Secondary</span><span class="hex">#78716c</span></div>
+          <div class="color-swatch accent"><span class="label">Accent</span><span class="hex">#eab308</span></div>
+        </div>
+
+        <div class="palette-label">Semantic Colors</div>
+        <div class="palette-row">
+          <div class="color-swatch success"><span class="label">Success</span><span class="hex">#22c55e</span></div>
+          <div class="color-swatch warning"><span class="label">Warning</span><span class="hex">#f59e0b</span></div>
+          <div class="color-swatch error"><span class="label">Error</span><span class="hex">#dc2626</span></div>
+        </div>
+
+        <div class="palette-label">Neutrals</div>
+        <div class="palette-row">
+          <div class="color-swatch neutral-1"><span class="label">Background</span><span class="hex">#fffbeb</span></div>
+          <div class="color-swatch neutral-2"><span class="label">Border</span><span class="hex">#fef3c7</span></div>
+          <div class="color-swatch neutral-3"><span class="label">Text</span><span class="hex">#1c1917</span></div>
+        </div>
+      </div>
+
+      <div class="components-section">
+        <div class="component-row">
+          <div class="component-label">Buttons</div>
+          <div class="buttons-row">
+            <button class="btn btn-primary">Generate API</button>
+            <button class="btn btn-secondary">Cancel</button>
+            <button class="btn btn-ghost">Learn More</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Form Input</div>
+          <div class="input-preview">
+            <input type="text" class="input-field" placeholder="Intelligence name..." value="Product Description Generator">
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Card Component</div>
+          <div class="card-preview">
+            <h4>Product Description API</h4>
+            <p>Generates compelling product descriptions from attributes and specifications.</p>
+            <span class="status"><span class="status-dot"></span> Active</span>
+          </div>
+        </div>
+
+        <div class="component-row">
+          <div class="component-label">Alerts</div>
+          <div class="alerts-row">
+            <div class="alert alert-success">
+              <span class="alert-icon">✓</span>
+              Intelligence generated successfully! Your API is ready to use.
+            </div>
+            <div class="alert alert-error">
+              <span class="alert-icon">!</span>
+              Schema validation failed. Please check your output format.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dark-mode-note">
+    <p>Dark mode variants can be generated for any chosen theme. All themes include full semantic color systems.</p>
+  </div>
+</body>
+</html>

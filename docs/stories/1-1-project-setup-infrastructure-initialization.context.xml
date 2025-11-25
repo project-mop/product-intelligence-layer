@@ -1,0 +1,184 @@
+<story-context id="1-1-project-setup-infrastructure-initialization" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1</storyId>
+    <title>Project Setup &amp; Infrastructure Initialization</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-1-project-setup-infrastructure-initialization.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a fully configured T3 stack project with database connectivity and CI/CD pipeline</iWant>
+    <soThat>I have a solid foundation to build the Product Intelligence Layer platform</soThat>
+    <tasks>
+      <task id="1" acs="1,2,3">
+        <title>Initialize T3 Stack Project</title>
+        <subtasks>
+          <subtask>Run npx create-t3-app@latest with TypeScript, tRPC, Prisma, NextAuth, Tailwind, App Router</subtask>
+          <subtask>Verify Next.js 15.x, TypeScript 5.x, tRPC 11.x, Prisma 7.x versions</subtask>
+          <subtask>Update package.json with project metadata</subtask>
+          <subtask>Run pnpm install and verify zero errors</subtask>
+          <subtask>Run pnpm dev and verify server starts on localhost:3000</subtask>
+        </subtasks>
+      </task>
+      <task id="2" acs="4">
+        <title>Configure PostgreSQL Database</title>
+        <subtasks>
+          <subtask>Create Railway project and PostgreSQL database</subtask>
+          <subtask>Copy connection string to .env as DATABASE_URL</subtask>
+          <subtask>Update prisma/schema.prisma with postgresql provider</subtask>
+          <subtask>Run pnpm prisma generate</subtask>
+          <subtask>Run pnpm prisma db push</subtask>
+          <subtask>Verify connection with pnpm prisma studio</subtask>
+        </subtasks>
+      </task>
+      <task id="3" acs="6">
+        <title>Set Up Environment Configuration</title>
+        <subtasks>
+          <subtask>Create .env.example with all required variables</subtask>
+          <subtask>Verify .env in .gitignore</subtask>
+          <subtask>Document environment setup in README.md</subtask>
+        </subtasks>
+      </task>
+      <task id="4" acs="5">
+        <title>Configure CI/CD Pipeline</title>
+        <subtasks>
+          <subtask>Create .github/workflows/ci.yml</subtask>
+          <subtask>Add typecheck script to package.json</subtask>
+          <subtask>Verify GitHub Actions workflow runs on push</subtask>
+        </subtasks>
+      </task>
+      <task id="5" acs="1,2,3,4,5,6">
+        <title>Verify All Acceptance Criteria</title>
+        <subtasks>
+          <subtask>Run pnpm install and pnpm dev - verify server starts</subtask>
+          <subtask>Run pnpm typecheck - verify zero TypeScript errors</subtask>
+          <subtask>Run pnpm lint - verify zero ESLint warnings</subtask>
+          <subtask>Run pnpm prisma db push - verify database sync</subtask>
+          <subtask>Push to GitHub - verify CI workflow passes</subtask>
+          <subtask>Review .env.example - verify all variables documented</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Running pnpm install and pnpm dev starts the development server successfully</criterion>
+    <criterion id="2">TypeScript compilation completes with zero errors</criterion>
+    <criterion id="3">ESLint passes with zero warnings</criterion>
+    <criterion id="4">Database migrations run successfully against local PostgreSQL</criterion>
+    <criterion id="5">CI pipeline (GitHub Actions) runs on push to main branch</criterion>
+    <criterion id="6">Environment variables are documented in .env.example</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Technology Stack</section>
+        <snippet>T3 Stack: Next.js 15.5.x with App Router, TypeScript 5.9.x, tRPC 11.x, Prisma 7.x, NextAuth.js 5.x, Tailwind CSS 4.x. PostgreSQL for data persistence. Railway for hosting.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Project Structure</section>
+        <snippet>Defines directory layout: src/app for Next.js App Router, src/server for backend logic, src/server/api/routers for tRPC routers, prisma/ for database schema.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Dependencies and Integrations</section>
+        <snippet>NPM dependencies: next 15.5.x, typescript 5.9.x, @trpc/server 11.x, @prisma/client 7.x, next-auth 5.x, bcryptjs 2.x, zod 3.x, tailwindcss 4.x.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Acceptance Criteria</section>
+        <snippet>Story 1.1 criteria: dev server starts, TypeScript zero errors, ESLint zero warnings, database migrations run, CI pipeline runs, env vars documented.</snippet>
+      </doc>
+      <doc>
+        <path>Product_Intelligence_Layer_PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Technical Architecture Overview</section>
+        <snippet>External dependencies: Railway for hosting (app + PostgreSQL), Anthropic Claude for LLM, Stripe for billing, N8N for email workflows.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 1: Foundation and Infrastructure</section>
+        <snippet>Story 1.1 covers T3 stack initialization, Railway PostgreSQL setup, environment configuration, and CI/CD pipeline with GitHub Actions.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <!-- No existing code - this is project initialization -->
+      <note>This is the first story - no existing codebase. Project will be scaffolded from create-t3-app.</note>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <note>Will be installed via create-t3-app scaffold</note>
+        <package name="next" version="15.5.x" />
+        <package name="typescript" version="5.9.x" />
+        <package name="@trpc/server" version="11.x" />
+        <package name="@trpc/client" version="11.x" />
+        <package name="@trpc/react-query" version="11.x" />
+        <package name="@prisma/client" version="7.x" />
+        <package name="next-auth" version="5.x" />
+        <package name="zod" version="3.x" />
+        <package name="tailwindcss" version="4.x" />
+      </ecosystem>
+      <ecosystem name="devDependencies">
+        <package name="prisma" version="7.x" />
+        <package name="eslint" version="latest" />
+        <package name="prettier" version="latest" />
+      </ecosystem>
+      <external>
+        <service name="Railway" purpose="PostgreSQL hosting" config="DATABASE_URL" />
+        <service name="GitHub Actions" purpose="CI/CD pipeline" config=".github/workflows/ci.yml" />
+      </external>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="docs/architecture.md">Use pnpm as package manager (not npm or yarn)</constraint>
+    <constraint source="docs/architecture.md">Use Next.js App Router (not Pages Router)</constraint>
+    <constraint source="docs/architecture.md">Use PostgreSQL provider in Prisma schema</constraint>
+    <constraint source="docs/tech-spec-epic-1.md">ADR-001: PostgreSQL as single data store (no Redis for MVP)</constraint>
+    <constraint source="docs/tech-spec-epic-1.md">ADR-003: tRPC for internal APIs, REST for public APIs</constraint>
+    <constraint source="docs/architecture.md">Node.js 20.x LTS required</constraint>
+    <constraint source="story">Environment secrets must never be committed - use .env.example template only</constraint>
+  </constraints>
+
+  <interfaces>
+    <!-- No interfaces to implement in this story - foundation only -->
+    <note>This story creates the foundation. Interfaces will be defined in subsequent stories (1.2+).</note>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework will be configured in later stories. For Story 1.1, validation is manual:
+      - Verify dev server starts (pnpm dev)
+      - Verify TypeScript compiles (pnpm typecheck)
+      - Verify ESLint passes (pnpm lint)
+      - Verify database connectivity (pnpm prisma studio)
+      - Verify CI pipeline passes (GitHub Actions)
+    </standards>
+    <locations>
+      <location>__tests__/ (to be created in future stories)</location>
+      <location>src/**/*.test.ts (to be created in future stories)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Manual: Run pnpm dev, verify localhost:3000 loads</idea>
+      <idea ac="2">Manual: Run pnpm typecheck, verify exit code 0</idea>
+      <idea ac="3">Manual: Run pnpm lint, verify no warnings</idea>
+      <idea ac="4">Manual: Run prisma db push, verify schema syncs</idea>
+      <idea ac="5">Manual: Push commit, verify GitHub Actions green</idea>
+      <idea ac="6">Manual: Review .env.example contains all variables</idea>
+    </ideas>
+  </tests>
+</story-context>

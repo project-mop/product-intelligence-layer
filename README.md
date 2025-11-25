@@ -37,12 +37,37 @@ npx auth secret
 
 ### 3. Database Setup
 
+**Option A: Local PostgreSQL (macOS with Homebrew)**
+
+```bash
+# Install PostgreSQL 16
+brew install postgresql@16
+
+# Start PostgreSQL service
+brew services start postgresql@16
+
+# Create the database
+/opt/homebrew/opt/postgresql@16/bin/createdb product-intelligence-layer
+
+# Update .env with local connection string
+# DATABASE_URL="postgresql://YOUR_USERNAME@localhost:5432/product-intelligence-layer"
+```
+
+**Option B: Railway PostgreSQL**
+
+1. Create a project at [railway.app](https://railway.app)
+2. Add PostgreSQL database plugin
+3. Copy connection string from Variables tab
+4. Update `DATABASE_URL` in `.env`
+
+**Then sync the schema:**
+
 ```bash
 # Push schema to database
-pnpm db:push
+pnpm prisma db push
 
 # (Optional) Open Prisma Studio to view data
-pnpm db:studio
+pnpm prisma studio
 ```
 
 ### 4. Run Development Server
@@ -62,10 +87,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `pnpm start` | Start production server |
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Run ESLint |
-| `pnpm db:push` | Push Prisma schema to database |
-| `pnpm db:studio` | Open Prisma Studio |
-| `pnpm db:generate` | Generate Prisma migrations |
-| `pnpm db:migrate` | Deploy Prisma migrations |
+| `pnpm prisma db push` | Push Prisma schema to database |
+| `pnpm prisma studio` | Open Prisma Studio |
+| `pnpm prisma generate` | Regenerate Prisma client |
+| `pnpm prisma migrate dev` | Create and apply migrations |
 
 ## Technology Stack
 

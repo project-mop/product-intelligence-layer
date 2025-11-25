@@ -24,6 +24,53 @@ RESOLUTION:
 
 ---
 
+## ⚠️ IMPORTANT: Local Services in Use
+
+**We are currently using LOCAL services for development.**
+
+This is a temporary setup. Before deploying to production or sharing the project:
+1. Set up a Railway PostgreSQL database (or other hosted provider)
+2. Update `DATABASE_URL` in `.env` with the production connection string
+3. Run `pnpm prisma db push` to sync schema to the production database
+4. Update CI/CD secrets with the production DATABASE_URL
+
+The local services are NOT accessible to other developers or CI/CD pipelines.
+
+### Local Services Created
+
+| Service | Installation Method | Status | Management Commands |
+|---------|---------------------|--------|---------------------|
+| PostgreSQL 16 | Homebrew (`brew install postgresql@16`) | Running as background service | `brew services start/stop postgresql@16` |
+
+### PostgreSQL Details
+
+- **Version:** 16.x
+- **Database Name:** `product-intelligence-layer`
+- **Connection:** `postgresql://zac@localhost:5432/product-intelligence-layer`
+- **Data Directory:** `/opt/homebrew/var/postgresql@16`
+- **Binary Path:** `/opt/homebrew/opt/postgresql@16/bin/`
+
+### Useful Commands
+
+```bash
+# Start PostgreSQL
+brew services start postgresql@16
+
+# Stop PostgreSQL
+brew services stop postgresql@16
+
+# Check service status
+brew services list | grep postgresql
+
+# Connect to database via psql
+/opt/homebrew/opt/postgresql@16/bin/psql product-intelligence-layer
+
+# List all databases
+/opt/homebrew/opt/postgresql@16/bin/psql -l
+```
+
+---
+
 ## Resolved Items
 
 ### Story 1.1: Project Setup & Infrastructure Initialization (RESOLVED)
@@ -32,6 +79,7 @@ RESOLUTION:
 - **Database:** Local PostgreSQL via Homebrew (postgresql@16)
 - **Connection:** `postgresql://zac@localhost:5432/product-intelligence-layer`
 - **Resolution Date:** 2025-11-25
+- **Note:** Using local database for development only - production setup pending
 
 All items from Story 1.1 have been resolved:
 - [x] Initial Schema Sync - `pnpm prisma db push` successful

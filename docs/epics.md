@@ -15,15 +15,18 @@ This document provides the complete epic and story breakdown for the Product Int
 
 | Epic | Title | Stories | FRs Covered | Scope |
 |------|-------|---------|-------------|-------|
-| 1 | Foundation & Infrastructure | 6 | FR-801–806, FR-901–905 | MVP |
-| 2 | Intelligence Definition | 6 | FR-101–110 | MVP |
-| 3 | API Generation & Endpoints | 7 | FR-201–206, FR-301–308 | MVP |
+| 1 | Foundation & Infrastructure | 5 | FR-801–802, FR-804–806, FR-901–903 | MVP |
+| 2 | Intelligence Definition | 7 | FR-101–110 | MVP |
+| 3 | API Generation & Endpoints | 6 | FR-201–206, FR-301–306, FR-308 | MVP |
 | 4 | Schema Validation & Output | 6 | FR-501–513 | MVP |
 | 5 | Environments & Versioning | 5 | FR-601–605, FR-309–312 | MVP |
-| 6 | Observability & Logging | 5 | FR-401–411 | MVP |
-| 7 | Rate Limiting & Billing | 10 | FR-701–706, FR-904–911 | MVP |
+| 6 | Observability & Logging | 6 | FR-307, FR-401–411 | MVP |
+| 7A | Usage & Quotas | 5 | FR-701–706, FR-904–905 | MVP |
+| 7B | Stripe Integration | 5 | FR-907–911 | MVP |
 | 8 | External Integrations (N8N) | 4 | FR-912–915 | MVP |
 | **Total** | | **49** | **90 FRs** | |
+
+> **Note:** Story 1.5 (Tenant Encryption at Rest / FR-803) has been deferred to Growth phase. Platform-level encryption at rest (provided by Supabase/Vercel Postgres) is sufficient for MVP targeting mid-market ecommerce.
 
 ### FR Coverage Matrix
 
@@ -35,9 +38,9 @@ All 90 functional requirements are covered:
 - **FR-400s (Call History & Logging):** Epic 6
 - **FR-500s (Schema & Validation):** Epic 4
 - **FR-600s (Environments):** Epic 5
-- **FR-700s (Rate Limiting & Quotas):** Epic 7
-- **FR-800s (Security & Isolation):** Epic 1
-- **FR-900s (User Management + Stripe):** Epics 1, 7
+- **FR-700s (Rate Limiting & Quotas):** Epic 7A
+- **FR-800s (Security & Isolation):** Epic 1 (FR-803 deferred to Growth)
+- **FR-900s (User Management + Stripe):** Epics 1, 7A, 7B
 - **FR-910s (N8N Integration):** Epic 8
 
 ---
@@ -48,7 +51,9 @@ All 90 functional requirements are covered:
 
 **Value:** Without foundation, nothing else can be built. This epic creates the secure, isolated environment that enterprise customers require.
 
-**FRs Covered:** FR-801, FR-802, FR-803, FR-804, FR-805, FR-806, FR-807, FR-809, FR-810, FR-811, FR-901, FR-902, FR-903
+**FRs Covered:** FR-801, FR-802, FR-804, FR-805, FR-806, FR-807, FR-809, FR-810, FR-811, FR-901, FR-902, FR-903
+
+> **Note:** FR-803 (per-tenant encryption) deferred to Growth phase.
 
 ---
 
@@ -172,7 +177,9 @@ So that **I can securely integrate my intelligences with external systems**.
 
 ---
 
-### Story 1.5: Tenant Encryption at Rest
+### ~~Story 1.5: Tenant Encryption at Rest~~ (DEFERRED TO GROWTH)
+
+> **Deferred:** Per-tenant encryption keys are an enterprise compliance feature. For MVP targeting mid-market ecommerce (Phase 1 beachhead), platform-level encryption at rest (provided by Supabase/Vercel Postgres) is sufficient. This story will be implemented in Growth phase when targeting enterprise manufacturing customers.
 
 As a **security-conscious customer**,
 I want **my data encrypted at rest with tenant-specific keys**,
@@ -197,7 +204,7 @@ So that **my data is protected even if storage is compromised**.
 
 ---
 
-### Story 1.6: Audit Logging Foundation
+### Story 1.5: Audit Logging Foundation (was 1.6)
 
 As a **platform operator**,
 I want **all significant tenant actions logged for audit purposes**,
@@ -229,6 +236,36 @@ So that **we can investigate issues and demonstrate compliance**.
 **Value:** This is the core user action—defining what intelligence they want. Without this, users cannot create any value.
 
 **FRs Covered:** FR-101, FR-102, FR-103, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-110
+
+---
+
+### Story 2.0: Development Seed Data
+
+As a **developer**,
+I want **seed data scripts that create sample tenants, users, and intelligence definitions**,
+So that **I can test UI components and API endpoints without manual data entry**.
+
+**Acceptance Criteria:**
+
+**Given** a fresh database
+**When** I run the seed script (`pnpm db:seed`)
+**Then** sample data is created including:
+- 2 test tenants (with different subscription tiers)
+- 3 users per tenant (admin, developer, viewer roles)
+- 5 sample intelligence definitions per tenant (various states: draft, sandbox, production)
+- Sample API keys for testing
+
+**And** seed data uses deterministic IDs for test assertions
+**And** seed script is idempotent (can run multiple times safely)
+**And** seed data is clearly marked as test data (prefixed names)
+
+**Prerequisites:** Story 1.3, Story 2.1
+
+**Technical Notes:**
+- Create `prisma/seed.ts` following Prisma seeding conventions
+- Include realistic ecommerce intelligence examples (product descriptions, attribute extraction)
+- Add to `package.json` scripts: `"db:seed": "tsx prisma/seed.ts"`
+- Consider separate `seed:minimal` for CI and `seed:full` for development
 
 ---
 
@@ -395,7 +432,9 @@ So that **I can keep my workspace clean**.
 
 **Value:** This is the core product value—users get working API endpoints without writing code.
 
-**FRs Covered:** FR-201, FR-202, FR-203, FR-204, FR-205, FR-206, FR-301, FR-302, FR-303, FR-304, FR-305, FR-306, FR-307, FR-308
+**FRs Covered:** FR-201, FR-202, FR-203, FR-204, FR-205, FR-206, FR-301, FR-303, FR-304, FR-306, FR-308
+
+> **Note:** FR-307 (Export API Results) moved to Epic 6 (Story 6.6) due to dependency on call logging infrastructure.
 
 ---
 
@@ -553,28 +592,9 @@ So that **I can integrate quickly without guessing**.
 
 ---
 
-### Story 3.7: Export API Results
+### ~~Story 3.7: Export API Results~~ (MOVED TO EPIC 6)
 
-As a **user**,
-I want **to export my API call results**,
-So that **I can analyze them offline or share with colleagues**.
-
-**Acceptance Criteria:**
-
-**Given** I am viewing an intelligence's call history
-**When** I click "Export"
-**Then** I can download results as CSV or JSON
-
-**And** I can select date range for export
-**And** I can choose which fields to include
-**And** export includes input, output, timestamp, and latency
-
-**Prerequisites:** Story 6.1 (call logging)
-
-**Technical Notes:**
-- Covers FR-307 (export results)
-- Stream large exports to avoid memory issues
-- Consider async export for large datasets
+> **Moved:** This story has been relocated to Epic 6 as Story 6.6 due to its dependency on call logging infrastructure (Story 6.1). See Epic 6 for the full story definition.
 
 ---
 
@@ -896,7 +916,9 @@ So that **my integrations don't break unexpectedly**.
 
 **Value:** Users need to see what's happening with their intelligences to build trust and debug issues.
 
-**FRs Covered:** FR-401, FR-402, FR-403, FR-404, FR-405, FR-406, FR-407, FR-408, FR-409, FR-410, FR-411
+**FRs Covered:** FR-307, FR-401, FR-402, FR-403, FR-404, FR-405, FR-406, FR-407, FR-408, FR-409, FR-410, FR-411
+
+> **Note:** FR-307 (Export API Results) moved here from Epic 3 due to dependency on call logging.
 
 ---
 
@@ -1032,17 +1054,43 @@ So that **sensitive data isn't stored in logs**.
 
 ---
 
-## Epic 7: Rate Limiting & Billing
+### Story 6.6: Export API Results (moved from Epic 3)
 
-**Goal:** Enforce usage quotas, rate limits, and enable usage-based billing via Stripe integration.
+As a **user**,
+I want **to export my API call results**,
+So that **I can analyze them offline or share with colleagues**.
 
-**Value:** This enables the business model, ensures fair resource usage across tenants, and provides self-serve subscription management.
+**Acceptance Criteria:**
 
-**FRs Covered:** FR-701, FR-702, FR-703, FR-704, FR-705, FR-706, FR-904, FR-905, FR-907, FR-908, FR-909, FR-910, FR-911
+**Given** I am viewing an intelligence's call history
+**When** I click "Export"
+**Then** I can download results as CSV or JSON
+
+**And** I can select date range for export
+**And** I can choose which fields to include
+**And** export includes input, output, timestamp, and latency
+
+**Prerequisites:** Story 6.1 (call logging), Story 6.2 (call history UI)
+
+**Technical Notes:**
+- Covers FR-307 (export results)
+- Stream large exports to avoid memory issues
+- Consider async export for large datasets (> 10,000 records)
+- Reuse export infrastructure from Story 6.4 (Log Export)
 
 ---
 
-### Story 7.1: Rate Limiting Infrastructure
+## Epic 7A: Usage & Quotas
+
+**Goal:** Enforce usage quotas, rate limits, and provide usage visibility for tenants.
+
+**Value:** This enables fair resource usage across tenants and gives users visibility into their consumption.
+
+**FRs Covered:** FR-701, FR-702, FR-703, FR-704, FR-705, FR-706, FR-904, FR-905
+
+---
+
+### Story 7A.1: Rate Limiting Infrastructure
 
 As a **system**,
 I want **to enforce per-endpoint rate limits**,
@@ -1067,7 +1115,7 @@ So that **no single tenant can overwhelm the system**.
 
 ---
 
-### Story 7.2: Monthly Quota Enforcement
+### Story 7A.2: Monthly Quota Enforcement
 
 As a **system**,
 I want **to enforce tenant-level monthly quotas**,
@@ -1083,7 +1131,7 @@ So that **usage aligns with subscription tier**.
 **And** current usage is tracked in real-time
 **And** quota usage is visible in dashboard
 
-**Prerequisites:** Story 7.1, Story 6.1
+**Prerequisites:** Story 7A.1, Story 6.1
 
 **Technical Notes:**
 - Covers FR-702 (monthly quotas)
@@ -1092,7 +1140,7 @@ So that **usage aligns with subscription tier**.
 
 ---
 
-### Story 7.3: Overage Behavior Configuration
+### Story 7A.3: Overage Behavior Configuration
 
 As a **user**,
 I want **to configure what happens when I exceed my quota**,
@@ -1108,7 +1156,7 @@ So that **I control the trade-off between availability and cost**.
 **And** changing the setting takes effect immediately
 **And** "Allow with Charges" requires payment method on file
 
-**Prerequisites:** Story 7.2
+**Prerequisites:** Story 7A.2
 
 **Technical Notes:**
 - Covers FR-703 (configurable overage)
@@ -1117,7 +1165,7 @@ So that **I control the trade-off between availability and cost**.
 
 ---
 
-### Story 7.4: Usage Dashboard
+### Story 7A.4: Usage Dashboard
 
 As a **user**,
 I want **to view my rate limits, quotas, and usage in the dashboard**,
@@ -1133,7 +1181,7 @@ So that **I can monitor and plan my usage**.
 **And** I see which intelligences use the most quota
 **And** data refreshes in near real-time
 
-**Prerequisites:** Story 7.2
+**Prerequisites:** Story 7A.2
 
 **Technical Notes:**
 - Covers FR-704 (visible in dashboard), FR-905 (view usage metrics)
@@ -1142,7 +1190,7 @@ So that **I can monitor and plan my usage**.
 
 ---
 
-### Story 7.5: Subscription Management
+### Story 7A.5: Subscription Management
 
 As a **user**,
 I want **to view and manage my subscription tier**,
@@ -1162,7 +1210,7 @@ So that **I can upgrade or downgrade as my needs change**.
 **And** I can cancel my subscription with confirmation
 **And** enterprise tier shows "Contact Sales"
 
-**Prerequisites:** Story 7.4
+**Prerequisites:** Story 7A.4
 
 **Technical Notes:**
 - Covers FR-904 (manage subscription), FR-705 (tier-based limits)
@@ -1171,7 +1219,19 @@ So that **I can upgrade or downgrade as my needs change**.
 
 ---
 
-### Story 7.6: Stripe Account Integration
+## Epic 7B: Stripe Integration
+
+**Goal:** Enable payment processing and subscription management via Stripe.
+
+**Value:** This enables the business model with self-serve subscription management and payment processing.
+
+**FRs Covered:** FR-907, FR-908, FR-909, FR-910, FR-911
+
+**Prerequisites:** Epic 7A (particularly Story 7A.5 for subscription management UI)
+
+---
+
+### Story 7B.1: Stripe Account Integration (was 7.6)
 
 As a **platform operator**,
 I want **Stripe connected to the application with proper API key management**,
@@ -1188,7 +1248,7 @@ So that **we can process payments and manage subscriptions**.
 **And** Stripe SDK is initialized on server startup
 **And** connection health is verified on startup with graceful degradation if unavailable
 
-**Prerequisites:** Story 1.1, Story 1.5
+**Prerequisites:** Story 1.1
 
 **Technical Notes:**
 - Covers FR-907 (Stripe integration foundation)
@@ -1199,7 +1259,7 @@ So that **we can process payments and manage subscriptions**.
 
 ---
 
-### Story 7.7: Stripe Checkout for Subscriptions
+### Story 7B.2: Stripe Checkout for Subscriptions (was 7.7)
 
 As a **user**,
 I want **to subscribe to a paid plan via Stripe Checkout**,
@@ -1220,7 +1280,7 @@ So that **I can upgrade from free tier with a secure payment flow**.
 **And** checkout session expires after 24 hours if not completed
 **And** user's Stripe Customer ID is stored in our database
 
-**Prerequisites:** Story 7.6, Story 7.5
+**Prerequisites:** Story 7B.1, Story 7A.5
 
 **Technical Notes:**
 - Covers FR-908 (Stripe Checkout integration)
@@ -1231,7 +1291,7 @@ So that **I can upgrade from free tier with a secure payment flow**.
 
 ---
 
-### Story 7.8: Stripe Webhook Handler
+### Story 7B.3: Stripe Webhook Handler (was 7.8)
 
 As a **system**,
 I want **to receive and process Stripe webhook events**,
@@ -1255,7 +1315,7 @@ So that **subscription changes are reflected in our system in real-time**.
 **And** unhandled event types are logged but don't error
 **And** failed processing is logged with full context for debugging
 
-**Prerequisites:** Story 7.6
+**Prerequisites:** Story 7B.1
 
 **Technical Notes:**
 - Covers FR-909 (Stripe webhook handling)
@@ -1266,7 +1326,7 @@ So that **subscription changes are reflected in our system in real-time**.
 
 ---
 
-### Story 7.9: Stripe Customer Portal
+### Story 7B.4: Stripe Customer Portal (was 7.9)
 
 As a **user**,
 I want **to manage my payment methods and billing history via Stripe Customer Portal**,
@@ -1291,7 +1351,7 @@ So that **I can update my card or view invoices without custom UI**.
 **And** portal session has 24-hour expiry
 **And** return URL brings user back to account settings
 
-**Prerequisites:** Story 7.8
+**Prerequisites:** Story 7B.3
 
 **Technical Notes:**
 - Covers FR-910 (self-serve billing management)
@@ -1301,7 +1361,7 @@ So that **I can update my card or view invoices without custom UI**.
 
 ---
 
-### Story 7.10: Stripe Test/Live Mode Management
+### Story 7B.5: Stripe Test/Live Mode Management (was 7.10)
 
 As a **developer**,
 I want **clear separation between Stripe test and live modes**,
@@ -1322,7 +1382,7 @@ So that **we don't accidentally process real payments in development**.
 **And** webhook endpoints work in both modes (separate webhook secrets)
 **And** test mode uses Stripe test clocks for subscription testing if needed
 
-**Prerequisites:** Story 7.6
+**Prerequisites:** Story 7B.1
 
 **Technical Notes:**
 - Covers FR-911 (test/live mode separation)
@@ -1339,7 +1399,13 @@ So that **we don't accidentally process real payments in development**.
 
 **Value:** Enables transactional emails (welcome, alerts) without building email infrastructure in the app, per ADR-005.
 
-**FRs Covered:** FR-912, FR-913, FR-914
+**FRs Covered:** FR-912, FR-913, FR-914, FR-915
+
+**Prerequisites Summary:**
+- Story 8.1: Story 1.1 (project setup)
+- Story 8.2: Story 8.1 + Story 1.3 (user auth)
+- Story 8.3: Story 8.1 + Story 7A.2 (quotas)
+- Story 8.4: Story 8.1 + Story 7B.3 (Stripe webhooks)
 
 ---
 
@@ -1439,7 +1505,7 @@ So that **I can upgrade or adjust usage before service is impacted**.
 **And** alert state is tracked to prevent duplicate emails
 **And** webhook failure is logged but doesn't affect API calls
 
-**Prerequisites:** Story 8.1, Story 7.2
+**Prerequisites:** Story 8.1, Story 7A.2
 
 **Technical Notes:**
 - Covers FR-914 (quota alert trigger)
@@ -1474,7 +1540,7 @@ So that **I can update my payment method and avoid service interruption**.
 **And** email is only sent once per failed invoice (not on Stripe retries)
 **And** webhook failure is logged for debugging
 
-**Prerequisites:** Story 8.1, Story 7.8
+**Prerequisites:** Story 8.1, Story 7B.3
 
 **Technical Notes:**
 - Covers FR-915 (payment failure notification)
@@ -1510,7 +1576,7 @@ So that **I can update my payment method and avoid service interruption**.
 | FR-304 | View JSON schema | 3 | 3.5 |
 | FR-305 | Roll back to previous version | 5 | 5.4 |
 | FR-306 | Disable/enable API keys | 1 | 1.4 |
-| FR-307 | Export results | 3 | 3.7 |
+| FR-307 | Export results | 6 | 6.6 |
 | FR-308 | Auto-generated API documentation | 3 | 3.6 |
 | FR-309 | Immutable versions in production | 5 | 5.4 |
 | FR-310 | Explicit publish action | 5 | 5.5 |
@@ -1544,18 +1610,18 @@ So that **I can update my payment method and avoid service interruption**.
 | FR-602 | Production mode | 5 | 5.1 |
 | FR-603 | Promote sandbox to production | 5 | 5.3 |
 | FR-604 | Separate API keys per environment | 5 | 5.2 |
-| FR-605 | Sandbox calls don't count against quota | 7 | 7.2 |
-| FR-701 | Per-endpoint rate limits | 7 | 7.1 |
-| FR-702 | Tenant-level monthly quotas | 7 | 7.2 |
-| FR-703 | Configurable overage behavior | 7 | 7.3 |
-| FR-704 | Limits visible in dashboard | 7 | 7.4 |
-| FR-705 | Tier-based rate limits | 7 | 7.5 |
-| FR-706 | Quota limit alerts | 7 | 7.4 |
+| FR-605 | Sandbox calls don't count against quota | 7A | 7A.2 |
+| FR-701 | Per-endpoint rate limits | 7A | 7A.1 |
+| FR-702 | Tenant-level monthly quotas | 7A | 7A.2 |
+| FR-703 | Configurable overage behavior | 7A | 7A.3 |
+| FR-704 | Limits visible in dashboard | 7A | 7A.4 |
+| FR-705 | Tier-based rate limits | 7A | 7A.5 |
+| FR-706 | Quota limit alerts | 7A | 7A.4 |
 | FR-801 | Isolated prompt logic | 1 | 1.2 |
 | FR-802 | Isolated config stores | 1 | 1.2 |
-| FR-803 | Per-tenant encryption | 1 | 1.5 |
+| FR-803 | Per-tenant encryption | — | Growth (deferred) |
 | FR-804 | Dedicated API keys | 1 | 1.4 |
-| FR-805 | Audit logs | 1 | 1.6 |
+| FR-805 | Audit logs | 1 | 1.5 |
 | FR-806 | No cross-tenant access | 1 | 1.2 |
 | FR-807 | Bearer token authentication | 1 | 1.4 |
 | FR-808 | Token scope per-intelligence | 1 | 1.4 |
@@ -1566,14 +1632,14 @@ So that **I can update my payment method and avoid service interruption**.
 | FR-901 | User signup | 1 | 1.3 |
 | FR-902 | User login | 1 | 1.3 |
 | FR-903 | Password reset | 1 | 1.3 |
-| FR-904 | Manage subscription | 7 | 7.5 |
-| FR-905 | View usage metrics | 7 | 7.4 |
+| FR-904 | Manage subscription | 7A | 7A.5 |
+| FR-905 | View usage metrics | 7A | 7A.4 |
 | FR-906 | OAuth 2.0 SSO | — | Growth (deferred) |
-| FR-907 | Stripe integration foundation | 7 | 7.6 |
-| FR-908 | Stripe Checkout integration | 7 | 7.7 |
-| FR-909 | Stripe webhook handling | 7 | 7.8 |
-| FR-910 | Self-serve billing management | 7 | 7.9 |
-| FR-911 | Stripe test/live mode separation | 7 | 7.10 |
+| FR-907 | Stripe integration foundation | 7B | 7B.1 |
+| FR-908 | Stripe Checkout integration | 7B | 7B.2 |
+| FR-909 | Stripe webhook handling | 7B | 7B.3 |
+| FR-910 | Self-serve billing management | 7B | 7B.4 |
+| FR-911 | Stripe test/live mode separation | 7B | 7B.5 |
 | FR-912 | N8N integration foundation | 8 | 8.1 |
 | FR-913 | Welcome email trigger | 8 | 8.2 |
 | FR-914 | Quota alert trigger | 8 | 8.3 |
@@ -1584,24 +1650,28 @@ So that **I can update my payment method and avoid service interruption**.
 ## Sequencing Summary
 
 ```
-Epic 1: Foundation (6 stories)
+Epic 1: Foundation (5 stories) ← Story 1.5 deferred to Growth
     ↓
-Epic 2: Intelligence Definition (6 stories)
+Epic 2: Intelligence Definition (7 stories) ← Added Story 2.0 (seed data)
     ↓
-Epic 3: API Generation & Endpoints (7 stories)
+Epic 3: API Generation & Endpoints (6 stories) ← Story 3.7 moved to Epic 6
     ↓
 Epic 4: Schema Validation & Output (6 stories)
     ↓
 Epic 5: Environments & Versioning (5 stories)
     ↓
-Epic 6: Observability & Logging (5 stories)
+Epic 6: Observability & Logging (6 stories) ← Added Story 6.6 (export results)
     ↓
-Epic 7: Rate Limiting & Billing (10 stories) ← Updated: +5 Stripe stories
+Epic 7A: Usage & Quotas (5 stories) ← Split from Epic 7
     ↓
-Epic 8: External Integrations - N8N (4 stories) ← NEW
+Epic 7B: Stripe Integration (5 stories) ← Split from Epic 7 (can parallelize)
+    ↓
+Epic 8: External Integrations - N8N (4 stories)
 ```
 
-**Total: 49 stories covering 90 FRs (88 MVP + 2 Growth deferred)**
+**Total: 49 stories covering 90 FRs (87 MVP + 3 Growth deferred)**
+
+> **Parallelization Note:** Epic 7B (Stripe) can be developed in parallel with Epic 7A once Story 7A.5 (Subscription Management UI) is complete, as Stripe provides the payment backend for that UI.
 
 ---
 
@@ -1613,12 +1683,13 @@ The following FRs are tagged as Growth scope and not included in MVP stories:
 |-------|-------------|-------|
 | FR-312 | Deprecation warnings | Included in Story 5.5 (MVP) |
 | FR-411 | Toggle input anonymization | Included in Story 6.5 (MVP) |
-| FR-703 | Configurable overage behavior | Included in Story 7.3 (MVP) |
-| FR-706 | Quota limit alerts | Included in Story 7.4 (MVP) |
+| FR-703 | Configurable overage behavior | Included in Story 7A.3 (MVP) |
+| FR-706 | Quota limit alerts | Included in Story 7A.4 (MVP) |
+| FR-803 | Per-tenant encryption | **Deferred** — Platform-level encryption sufficient for MVP |
 | FR-812 | Isolated embeddings storage | Deferred to Growth phase |
 | FR-906 | OAuth 2.0 SSO | Deferred to Growth phase |
 
-Note: Most Growth FRs were incorporated into MVP stories as they were low incremental effort. Only FR-812 (embeddings) and FR-906 (OAuth SSO) are truly deferred.
+Note: FR-803 was deferred because mid-market ecommerce customers (Phase 1 beachhead) don't typically require per-tenant encryption keys. Platform-level encryption at rest (provided by Supabase/Vercel Postgres) meets their security requirements. This feature will be implemented in Growth phase when targeting enterprise manufacturing customers with stricter compliance needs.
 
 ---
 

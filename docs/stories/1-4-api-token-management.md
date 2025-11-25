@@ -87,7 +87,7 @@ This story implements API token management as specified in the Epic 1 tech spec 
 2. **Storage:** Only SHA-256 hash stored; plaintext shown once at creation
 3. **Validation:** Hash incoming key, query by hash, check expiry/revocation
 4. **Expiration:** Default 90 days, configurable via `API_KEY_DEFAULT_EXPIRY_DAYS` env var
-5. **Audit Logging:** Deferred to Story 1.6 (audit infrastructure not yet available)
+5. **Audit Logging:** Deferred to Story 1.5 (audit infrastructure not yet available)
 
 **Security Requirements (from tech spec):**
 

@@ -35,7 +35,7 @@ so that **I can access my account and protect my data**.
   - [x] Create Tenant record for new user
   - [x] Create User record linked to tenant with hashed password
   - [x] Return session token on successful signup
-  - [ ] Write audit log entry for "user.created" (deferred to Story 1.6: Audit Logging Foundation)
+  - [ ] Write audit log entry for "user.created" (deferred to Story 1.5: Audit Logging Foundation)
 
 - [x] **Task 3: Update User Model for Authentication** (AC: 1, 7)
   - [x] Add `passwordHash` field to User model in Prisma schema
@@ -49,7 +49,7 @@ so that **I can access my account and protect my data**.
   - [x] Trigger N8N webhook for password reset email (fire-and-forget)
   - [x] Implement `resetPassword` mutation
   - [x] Validate token, update password hash, delete used token
-  - [ ] Write audit log entries for password reset events (deferred to Story 1.6: Audit Logging Foundation)
+  - [ ] Write audit log entries for password reset events (deferred to Story 1.5: Audit Logging Foundation)
 
 - [x] **Task 5: Create N8N Webhook Client** (AC: 5)
   - [x] Create `src/server/services/n8n/client.ts`
@@ -183,7 +183,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - N8N webhook client created for welcome and password reset emails (fire-and-forget pattern)
 - Auth UI pages created with Suspense boundaries for useSearchParams compatibility
 - 22 unit tests passing (password hashing, token generation, N8N client)
-- Audit logging deferred to Story 1.6 as it requires the audit logging foundation
+- Audit logging deferred to Story 1.5 as it requires the audit logging foundation
 - Integration tests deferred pending test database setup
 - tenantId properly included in session via callback
 

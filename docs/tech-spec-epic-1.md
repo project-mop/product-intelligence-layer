@@ -1,9 +1,10 @@
 # Epic Technical Specification: Foundation & Infrastructure
 
 Date: 2025-11-25
+Updated: 2025-11-25 (Story 1.5 renumbering, encryption deferred)
 Author: Zac
 Epic ID: 1
-Status: Draft
+Status: In Progress (Stories 1.1-1.3 complete, 1.4 drafted, 1.5 pending)
 
 ---
 
@@ -13,16 +14,17 @@ Epic 1 establishes the foundational infrastructure for the Product Intelligence 
 
 The foundation must support multi-tenant isolation from day one, as this is a core security requirement (FR-801 through FR-806). All subsequent epics depend on this infrastructure being correctly implemented with proper tenant boundaries, authentication, and audit capabilities.
 
+> **Note:** Story 1.5 (Tenant Encryption at Rest / FR-803) has been deferred to Growth phase. Platform-level encryption at rest (provided by Railway PostgreSQL) is sufficient for MVP targeting mid-market ecommerce. The previous Story 1.6 (Audit Logging) has been renumbered to Story 1.5.
+
 ## Objectives and Scope
 
 ### In Scope
 
 - T3 stack project initialization with Next.js 15.5.x, TypeScript 5.9.x, tRPC 11.x, Prisma 7.x, NextAuth.js 5.x
-- PostgreSQL database setup on Railway with multi-tenant schema
-- Row-level security implementation for tenant isolation
-- User authentication (signup, login, password reset) via NextAuth.js
+- PostgreSQL database setup (local Homebrew for dev, Railway for production) with multi-tenant schema
+- Row-level security strategy documentation (application-level filtering for MVP)
+- User authentication (signup, login, password reset) via NextAuth.js with Credentials Provider
 - API token management (create, rotate, revoke, scope)
-- Per-tenant encryption at rest for sensitive configuration
 - Audit logging foundation for all tenant actions
 - CI/CD pipeline configuration (GitHub Actions)
 - Development environment setup scripts
@@ -32,10 +34,11 @@ The foundation must support multi-tenant isolation from day one, as this is a co
 - Intelligence definition UI (Epic 2)
 - API endpoint generation (Epic 3)
 - LLM integration (Epic 3)
-- Rate limiting logic (Epic 7)
-- Stripe billing integration (Epic 7)
-- N8N email workflows (Epic 8)
+- Rate limiting logic (Epic 7A)
+- Stripe billing integration (Epic 7B)
+- N8N email workflows (Epic 8) - Note: N8N webhook client created in Story 1.3 for password reset
 - OAuth 2.0 SSO (Growth scope - FR-906)
+- Per-tenant encryption at rest (Growth scope - FR-803)
 
 ## System Architecture Alignment
 
@@ -46,10 +49,9 @@ This epic implements the core infrastructure layer from the architecture documen
 | Next.js App Router | Story 1.1 - Project scaffolding |
 | Prisma + PostgreSQL | Stories 1.1, 1.2 - Database setup and schema |
 | NextAuth.js | Story 1.3 - Authentication system |
-| Tenant isolation | Story 1.2 - Row-level security |
+| Tenant isolation | Story 1.2 - RLS strategy documentation + application-level filtering |
 | API key management | Story 1.4 - Token CRUD operations |
-| Encryption at rest | Story 1.5 - Per-tenant encryption |
-| Audit logging | Story 1.6 - Action logging foundation |
+| Audit logging | Story 1.5 - Action logging foundation |
 
 **Key Architecture Decisions Applied:**
 - ADR-001: PostgreSQL as single data store (no Redis for MVP)
@@ -61,42 +63,43 @@ This epic implements the core infrastructure layer from the architecture documen
 
 | Module | Location | Responsibility |
 |--------|----------|----------------|
-| Database Client | `src/server/db.ts` | Prisma client singleton with tenant context |
-| Auth Config | `src/server/auth.ts` | NextAuth.js configuration |
+| Database Client | `src/server/db.ts` | Prisma client singleton with adapter pattern |
+| Auth Config | `src/server/auth/config.ts` | NextAuth.js configuration with Credentials Provider |
 | Auth Router | `src/server/api/routers/auth.ts` | tRPC procedures for auth operations |
 | Tenant Router | `src/server/api/routers/tenant.ts` | Tenant management procedures |
 | API Key Router | `src/server/api/routers/apiKey.ts` | Token CRUD procedures |
-| API Key Service | `src/server/services/auth/api-key.ts` | Token validation, hashing, scoping |
-| Encryption Service | `src/server/services/encryption/` | Per-tenant encryption utilities |
-| Audit Service | `src/server/services/audit/` | Audit log writing |
-| ID Generator | `src/lib/id.ts` | Prefixed ID generation (ten_, usr_, key_) |
+| API Key Service | `src/server/services/auth/api-key.ts` | Token generation, validation, hashing |
+| N8N Client | `src/server/services/n8n/client.ts` | Webhook triggers for email workflows |
+| Audit Service | `src/server/services/audit/` | Audit log writing (Story 1.5) |
+| ID Generator | `src/lib/id.ts` | Prefixed ID generation (ten_, usr_, key_, proc_, etc.) |
 
 ### Data Models and Contracts
 
 ```prisma
 // prisma/schema.prisma
+// Note: Actual implementation may vary slightly - refer to prisma/schema.prisma for authoritative schema
 
 model Tenant {
-  id          String   @id @default(cuid()) // ten_*
+  id          String   @id // ten_* prefix, generated by src/lib/id.ts
   name        String
-  encryptionKeyId String? // Reference to KMS key or encrypted key material
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
   users       User[]
   apiKeys     ApiKey[]
-  auditLogs   AuditLog[]
+  // auditLogs relation added in Story 1.5
 }
 
 model User {
-  id            String   @id @default(cuid()) // usr_*
+  id            String   @id // usr_* prefix, generated by src/lib/id.ts
   tenantId      String
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   email         String   @unique
   emailVerified DateTime?
   name          String?
-  passwordHash  String
+  passwordHash  String?  // bcrypt hash, cost factor 12 (added in Story 1.3)
+  image         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -302,12 +305,12 @@ interface ApiKeyContext {
 | Requirement | Implementation | FR Reference |
 |-------------|----------------|--------------|
 | Password hashing | bcrypt with cost factor 12 | FR-901, FR-902 |
-| Session tokens | HTTP-only secure cookies via NextAuth | FR-902 |
+| Session tokens | Database sessions via NextAuth (30-day default) | FR-902 |
 | API key storage | SHA-256 hash only, never plaintext | FR-804, FR-807 |
 | Token expiration | Default 90 days, configurable | FR-809 |
 | Immediate revocation | Check revokedAt on every validation | FR-811 |
-| Tenant isolation | Row-level filtering on ALL queries | FR-801, FR-802, FR-806 |
-| Encryption at rest | AES-256 for sensitive tenant config | FR-803 |
+| Tenant isolation | Application-level filtering on ALL queries (tenantId in WHERE) | FR-801, FR-802, FR-806 |
+| Encryption at rest | Platform-level (Railway PostgreSQL) - per-tenant deferred to Growth | FR-803 (deferred) |
 | CSRF protection | Built into NextAuth | Standard |
 
 ### Reliability/Availability
@@ -350,9 +353,9 @@ interface ApiKeyContext {
 | Service | Purpose | Configuration |
 |---------|---------|---------------|
 | PostgreSQL 16.x | Database | `DATABASE_URL` env var |
-| N8N (optional) | Welcome email webhook | `N8N_WEBHOOK_WELCOME_EMAIL` env var |
+| N8N | Welcome/password reset email webhooks | `N8N_WEBHOOK_BASE_URL`, `N8N_WEBHOOK_SECRET` env vars |
 
-**Note:** For local development, PostgreSQL is installed via Homebrew (`brew install postgresql@16`). See `database-debt.md` for local service details. Railway PostgreSQL is used for production deployment.
+**Note:** For local development, PostgreSQL is installed via Homebrew (`brew install postgresql@16`). See `docs/rls-strategy.md` for RLS implementation notes. Railway PostgreSQL is used for production deployment.
 
 ### Development Dependencies
 
@@ -405,15 +408,9 @@ interface ApiKeyContext {
 7. Tokens have configurable expiration (default 90 days)
 8. Expired tokens return 401 with clear error message
 
-### Story 1.5: Tenant Encryption at Rest
+### Story 1.5: Audit Logging Foundation
 
-1. Sensitive tenant configuration fields are encrypted in database
-2. Encryption uses AES-256 or equivalent
-3. Different tenants cannot decrypt each other's data
-4. Encryption keys are stored securely (environment variable or KMS reference)
-5. Application can read/write encrypted fields transparently
-
-### Story 1.6: Audit Logging
+> **Note:** Former Story 1.5 (Tenant Encryption at Rest / FR-803) has been deferred to Growth phase. This story was previously numbered 1.6.
 
 1. User signup creates audit log entry
 2. User login creates audit log entry
@@ -428,11 +425,10 @@ interface ApiKeyContext {
 | AC | Spec Section | Component(s) | Test Approach |
 |----|--------------|--------------|---------------|
 | 1.1.1-6 | Project Setup | Build system, CI | Automated CI checks |
-| 1.2.1-5 | Data Models | Prisma schema, middleware | Integration tests |
+| 1.2.1-5 | Data Models | Prisma schema, RLS strategy | Integration tests |
 | 1.3.1-8 | Auth Flow, Security | NextAuth, bcrypt | Unit + integration tests |
 | 1.4.1-8 | API Key Service | apiKey router, service | Unit + integration tests |
-| 1.5.1-5 | Encryption Service | encryption module | Unit tests with test keys |
-| 1.6.1-7 | Audit Service | audit module, AuditLog model | Integration tests |
+| 1.5.1-7 | Audit Service | audit module, AuditLog model | Integration tests |
 
 ## Risks, Assumptions, Open Questions
 
@@ -468,16 +464,16 @@ interface ApiKeyContext {
 
 | Level | Framework | Coverage Focus |
 |-------|-----------|----------------|
-| Unit | Vitest | Services (encryption, API key hashing, ID generation) |
+| Unit | Vitest | Services (password hashing, API key hashing, token generation, ID generation) |
 | Integration | Vitest + Prisma | Database operations, tenant isolation |
 | E2E | Playwright | Auth flows (signup, login, password reset) |
 
 ### Key Test Scenarios
 
-1. **Tenant Isolation:** Create two tenants, verify neither can access other's data
+1. **Tenant Isolation:** Create two tenants, verify neither can access other's data via application-level filtering
 2. **API Key Lifecycle:** Create → use → rotate → verify old invalid → use new → revoke → verify invalid
-3. **Auth Security:** Verify password hashing, session expiration, rate limiting on auth endpoints
-4. **Audit Completeness:** Verify all specified actions create audit entries
+3. **Auth Security:** Verify password hashing (bcrypt cost 12), session expiration (30 days), token generation
+4. **Audit Completeness:** Verify all specified actions create audit entries (Story 1.5)
 
 ### Test Data Strategy
 

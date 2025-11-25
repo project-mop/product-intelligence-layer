@@ -106,6 +106,43 @@ N8N_WEBHOOK_BASE_URL="https://your-n8n-instance.com/webhook"
 N8N_WEBHOOK_SECRET="your-secret"
 ```
 
+## API Keys
+
+API keys are used to authenticate requests to the public API. Manage keys from the dashboard:
+
+- **Dashboard:** `/dashboard/api-keys` - Create, view, rotate, and revoke API keys
+
+### Key Format
+
+```
+pil_{environment}_{random}
+
+Examples:
+- pil_live_a1b2c3d4...  (Production)
+- pil_test_f6e5d4c3...  (Sandbox)
+```
+
+### Usage
+
+Include the API key in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer pil_live_..." https://api.example.com/v1/process
+```
+
+### Configuration
+
+```bash
+# In .env (optional, default: 90 days)
+API_KEY_DEFAULT_EXPIRY_DAYS=90
+```
+
+### Security Notes
+
+- Keys are stored as SHA-256 hashes (plaintext shown only once at creation)
+- Keys can be rotated (old key immediately revoked, new key generated)
+- Revoked/expired keys return 401 Unauthorized
+
 ## Available Scripts
 
 | Script | Description |
@@ -140,21 +177,26 @@ N8N_WEBHOOK_SECRET="your-secret"
 ```
 product-intelligence-layer/
 ├── src/
-│   ├── app/           # Next.js App Router
-│   │   └── (auth)/    # Authentication pages (login, signup, etc.)
-│   ├── server/        # Backend logic (tRPC, services)
-│   │   ├── api/       # tRPC routers
-│   │   ├── auth/      # NextAuth configuration
-│   │   └── services/  # External service clients (N8N, etc.)
-│   ├── trpc/          # tRPC client setup
-│   ├── lib/           # Shared utilities
-│   └── styles/        # Global styles
-├── prisma/            # Database schema
-├── tests/             # Test files
-│   ├── unit/          # Unit tests
-│   └── integration/   # Integration tests
-├── docs/              # Project documentation
-└── bmad/              # BMAD methodology files
+│   ├── app/                    # Next.js App Router
+│   │   ├── (auth)/             # Authentication pages (login, signup, etc.)
+│   │   └── dashboard/          # Dashboard pages
+│   │       └── api-keys/       # API key management UI
+│   ├── server/                 # Backend logic (tRPC, services)
+│   │   ├── api/                # tRPC routers
+│   │   │   └── routers/        # Route handlers (auth, apiKey, etc.)
+│   │   ├── auth/               # NextAuth configuration
+│   │   └── services/           # Business logic services
+│   │       ├── auth/           # API key generation & validation
+│   │       └── n8n/            # N8N webhook client
+│   ├── trpc/                   # tRPC client setup
+│   ├── lib/                    # Shared utilities (ID generation, etc.)
+│   └── styles/                 # Global styles
+├── prisma/                     # Database schema
+├── tests/                      # Test files
+│   ├── unit/                   # Unit tests
+│   └── integration/            # Integration tests
+├── docs/                       # Project documentation
+└── bmad/                       # BMAD methodology files
 ```
 
 ## Documentation

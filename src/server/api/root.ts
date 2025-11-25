@@ -1,3 +1,4 @@
+import { apiKeyRouter } from "~/server/api/routers/apiKey";
 import { authRouter } from "~/server/api/routers/auth";
 import { postRouter } from "~/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
@@ -8,6 +9,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  apiKey: apiKeyRouter,
   auth: authRouter,
   post: postRouter,
 });

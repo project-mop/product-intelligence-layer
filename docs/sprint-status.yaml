@@ -40,7 +40,7 @@ development_status:
   1-1-project-setup-infrastructure-initialization: done
   1-2-multi-tenant-database-schema: done
   1-3-user-authentication-system: done
-  1-4-api-token-management: drafted
+  1-4-api-token-management: done
   1-5-audit-logging-foundation: backlog  # was 1-6, renumbered after 1-5 deferred
   # Note: Story 1.5 (Tenant Encryption at Rest) deferred to Growth phase
   epic-1-retrospective: optional

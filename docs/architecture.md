@@ -33,7 +33,7 @@ This establishes the base architecture with:
 | API (Internal) | tRPC † | 11.4.x | End-to-end type safety |
 | API (Public) | REST | - | Customer integrations |
 | ORM | Prisma † | 7.x | Type-safe DB access, Rust-free |
-| Database | PostgreSQL | 16.11 | Via Railway |
+| Database | PostgreSQL | 16.x | Local (Homebrew) or Railway |
 | Auth | NextAuth.js (Auth.js) † | 5.x (beta) | T3 default, flexible |
 | LLM Provider | Anthropic Claude | - | Provider-agnostic gateway |
 | Caching | PostgreSQL-based | - | MVP cost efficiency |
@@ -134,7 +134,7 @@ product-intelligence-layer/
 **Prisma + PostgreSQL**
 - Type-safe database access
 - Migrations managed via Prisma
-- PostgreSQL hosted on Railway
+- PostgreSQL: local (Homebrew) for development, Railway for production
 
 **NextAuth.js**
 - Session-based authentication
@@ -994,7 +994,27 @@ NODE_ENV="production"
 
 - Node.js 20.x LTS (minimum 20.0.0)
 - pnpm 9.x
-- PostgreSQL 16.11 (local or Railway dev)
+- PostgreSQL 16.x (local via Homebrew or Railway)
+
+### Local PostgreSQL Setup (macOS)
+
+For local development, PostgreSQL is installed via Homebrew:
+
+```bash
+# Install PostgreSQL 16
+brew install postgresql@16
+
+# Start service
+brew services start postgresql@16
+
+# Create database
+/opt/homebrew/opt/postgresql@16/bin/createdb product-intelligence-layer
+
+# Connection string format
+DATABASE_URL="postgresql://YOUR_USERNAME@localhost:5432/product-intelligence-layer"
+```
+
+**Note:** Local PostgreSQL is not accessible to CI/CD pipelines. For CI/CD and production, use Railway PostgreSQL. See `database-debt.md` for current local service configuration.
 
 ### Setup Commands
 

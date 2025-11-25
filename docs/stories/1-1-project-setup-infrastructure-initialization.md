@@ -158,7 +158,18 @@ product-intelligence-layer/
 - `src/components/dashboard/` - Dashboard UI components
 - `src/components/process/` - Process builder components
 
-### Railway Setup Notes
+### Local PostgreSQL Setup (Current)
+
+For this story, we're using local PostgreSQL via Homebrew:
+
+1. Install: `brew install postgresql@16`
+2. Start: `brew services start postgresql@16`
+3. Create DB: `/opt/homebrew/opt/postgresql@16/bin/createdb product-intelligence-layer`
+4. Connection: `postgresql://YOUR_USERNAME@localhost:5432/product-intelligence-layer`
+
+**Important:** Local database is not accessible to CI/CD pipelines. See `database-debt.md` for full configuration details and production migration notes.
+
+### Railway Setup Notes (For Production)
 
 1. Create account at railway.app (if needed)
 2. Create new project

@@ -314,7 +314,7 @@ interface ApiKeyContext {
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Database availability | Railway managed PostgreSQL with automatic failover |
+| Database availability | Local PostgreSQL (dev) / Railway managed PostgreSQL (prod) with automatic failover |
 | Session persistence | Database-backed sessions survive restarts |
 | Graceful degradation | Auth failures return clear error messages |
 | Data durability | Railway daily backups + WAL archiving |
@@ -349,8 +349,10 @@ interface ApiKeyContext {
 
 | Service | Purpose | Configuration |
 |---------|---------|---------------|
-| Railway PostgreSQL | Database | `DATABASE_URL` env var |
+| PostgreSQL 16.x | Database | `DATABASE_URL` env var |
 | N8N (optional) | Welcome email webhook | `N8N_WEBHOOK_WELCOME_EMAIL` env var |
+
+**Note:** For local development, PostgreSQL is installed via Homebrew (`brew install postgresql@16`). See `database-debt.md` for local service details. Railway PostgreSQL is used for production deployment.
 
 ### Development Dependencies
 

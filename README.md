@@ -156,6 +156,7 @@ API_KEY_DEFAULT_EXPIRY_DAYS=90
 | `pnpm test:unit` | Run unit tests only |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm test:coverage` | Run tests with coverage report |
+| `pnpm db:seed` | Seed database with sample data |
 | `pnpm prisma db push` | Push Prisma schema to database |
 | `pnpm prisma studio` | Open Prisma Studio |
 | `pnpm prisma generate` | Regenerate Prisma client |

@@ -1,0 +1,208 @@
+<story-context id="2-0-development-seed-data" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>0</storyId>
+    <title>Development Seed Data</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-0-development-seed-data.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>seed data scripts that create sample tenants, users, and intelligence definitions</iWant>
+    <soThat>I can test UI components and API endpoints without manual data entry</soThat>
+    <tasks>
+      <task id="1">Add Process and ProcessVersion models to Prisma schema (NOTE: Already exists - verify only)</task>
+      <task id="2">Create seed script structure (prisma/seed.ts with idempotent upsert logic)</task>
+      <task id="3">Create seed tenant data (2 tenants with _seed_ prefix IDs)</task>
+      <task id="4">Create seed user data (3 users per tenant with password hashing)</task>
+      <task id="5">Create seed intelligence definitions (5 processes per tenant in various states)</task>
+      <task id="6">Create seed API keys (sandbox and production per tenant)</task>
+      <task id="7">Add Process factory for tests (process.factory.ts, process-version.factory.ts)</task>
+      <task id="8">Verification (run seed, check idempotency, verify counts, run existing tests)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Running `pnpm db:seed` creates sample data without errors</criterion>
+    <criterion id="2">Seed data includes 2 tenants with different subscription contexts</criterion>
+    <criterion id="3">Seed data includes 3 users per tenant (admin, developer, viewer)</criterion>
+    <criterion id="4">Seed data includes 5 intelligence definitions per tenant in various states</criterion>
+    <criterion id="5">Seed data includes sample API keys for testing</criterion>
+    <criterion id="6">Seed data uses deterministic IDs prefixed with `_seed_`</criterion>
+    <criterion id="7">Seed script is idempotent (no duplicates on repeat runs)</criterion>
+    <criterion id="8">Seed data names prefixed with `[Seed]` for identification</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Seed Data Structure</section>
+        <snippet>Defines sample tenant, user, process, and API key data structures with deterministic IDs and realistic ecommerce examples.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Data Architecture</section>
+        <snippet>Defines entity naming conventions, ID prefixes (ten_, usr_, proc_, procv_, key_), and multi-tenant data model.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Factory Usage</section>
+        <snippet>Documents factory patterns with build() for in-memory and create() for persisted data. Process factories need to be added.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-6-test-infrastructure-setup.md</path>
+        <title>Story 1.6 Test Infrastructure</title>
+        <section>Completion Notes</section>
+        <snippet>Factory patterns established for Tenant, User, ApiKey, AuditLog. Use as reference for Process/ProcessVersion factories.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>Process, ProcessVersion, ProcessVersionStatus</symbol>
+        <lines>122-165</lines>
+        <reason>Process and ProcessVersion models ALREADY EXIST. Task 1 is verification only - no schema changes needed.</reason>
+      </file>
+      <file>
+        <path>src/lib/id.ts</path>
+        <kind>utility</kind>
+        <symbol>generateProcessId, generateProcessVersionId, ID_PREFIXES</symbol>
+        <lines>16-21, 60-73</lines>
+        <reason>ID generators ALREADY EXIST for proc_ and procv_ prefixes. Ready to use in seed script.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/tenant.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>tenantFactory</symbol>
+        <lines>1-99</lines>
+        <reason>Reference pattern for creating process.factory.ts - uses build/create/createMany methods.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/user.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>userFactory</symbol>
+        <lines>1-175</lines>
+        <reason>Reference for creating users with password hashing and tenant relationships.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/api-key.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>apiKeyFactory</symbol>
+        <reason>Reference for API key creation with hashing. Seed script should generate and log plaintext keys once.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/index.ts</path>
+        <kind>barrel</kind>
+        <symbol>factory exports</symbol>
+        <lines>1-46</lines>
+        <reason>Add processFactory and processVersionFactory exports here.</reason>
+      </file>
+      <file>
+        <path>tests/support/db.ts</path>
+        <kind>utility</kind>
+        <symbol>testDb, resetDatabase</symbol>
+        <reason>Database utilities for integration tests. Seed script should use main db client, not testDb.</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>@prisma/client</package>
+        <version>^7.0.1</version>
+        <reason>Database ORM for seed script</reason>
+      </package>
+      <package>bcryptjs</package>
+      <version>^3.0.3</version>
+      <reason>Password hashing for seed users</reason>
+      </node>
+      <devDependencies>
+        <package>tsx</package>
+        <version>latest</version>
+        <reason>TypeScript execution for seed script - add to devDependencies</reason>
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="docs/tech-spec-epic-2.md">Seed IDs must use `_seed_` infix for identification (e.g., ten_seed_acme)</constraint>
+    <constraint source="docs/tech-spec-epic-2.md">Seed names must be prefixed with `[Seed]` for visibility in UI</constraint>
+    <constraint source="docs/architecture.md">Use bcrypt cost factor 12 for password hashing</constraint>
+    <constraint source="docs/architecture.md">All tenant-scoped queries must include tenantId filter</constraint>
+    <constraint source="prisma/schema.prisma">ProcessVersion.status enum: DRAFT, SANDBOX, PRODUCTION, DEPRECATED</constraint>
+    <constraint source="prisma/schema.prisma">ProcessVersion has @@unique([processId, version]) constraint</constraint>
+    <constraint source="docs/testing-strategy-mvp.md">New factories must follow build/create pattern from existing factories</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Process Model</name>
+      <kind>Prisma model</kind>
+      <signature>{ id: string, tenantId: string, name: string, description?: string, inputSchema: Json, outputSchema: Json, categories: string[], createdAt: Date, updatedAt: Date, deletedAt?: Date }</signature>
+      <path>prisma/schema.prisma:122-144</path>
+    </interface>
+    <interface>
+      <name>ProcessVersion Model</name>
+      <kind>Prisma model</kind>
+      <signature>{ id: string, processId: string, version: string, config: Json, environment: Environment, publishedAt?: Date, deprecatedAt?: Date, createdAt: Date }</signature>
+      <path>prisma/schema.prisma:147-165</path>
+    </interface>
+    <interface>
+      <name>ProcessConfig Type</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ goal: string, systemPrompt: string, maxTokens: number, temperature: number, cacheTtlSeconds: number, cacheEnabled: boolean, requestsPerMinute: number, inputSchemaDescription?: string, outputSchemaDescription?: string, components?: ComponentDefinition[] }</signature>
+      <path>docs/tech-spec-epic-2.md#ProcessConfig</path>
+    </interface>
+    <interface>
+      <name>Factory Pattern</name>
+      <kind>TypeScript module</kind>
+      <signature>{ build(overrides?): Entity, create(overrides?): Promise&lt;Entity&gt;, createMany(count, overrides?): Promise&lt;Entity[]&gt; }</signature>
+      <path>tests/support/factories/tenant.factory.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit/integration tests. Follow existing factory patterns in tests/support/factories/.
+      Integration tests use testDb from tests/support/db.ts with automatic cleanup.
+      Coverage threshold: 90% (unit-testable code).
+      Test files: *.test.ts for unit/integration, *.spec.ts for E2E.
+    </standards>
+    <locations>
+      <location>tests/unit/</location>
+      <location>tests/integration/</location>
+      <location>tests/support/factories/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verify `pnpm db:seed` completes without errors</idea>
+      <idea ac="2">Verify 2 tenants created with correct names and IDs</idea>
+      <idea ac="3">Verify 6 users created (3 per tenant) with hashed passwords</idea>
+      <idea ac="4">Verify 10 processes created (5 per tenant) with various statuses</idea>
+      <idea ac="5">Verify 4 API keys created with correct environments</idea>
+      <idea ac="6">Verify all IDs contain `_seed_` infix</idea>
+      <idea ac="7">Run seed twice, verify no duplicate records created</idea>
+      <idea ac="8">Verify all names contain `[Seed]` prefix</idea>
+      <idea>processFactory.build() returns valid Process object with generated ID</idea>
+      <idea>processFactory.create() persists Process to database</idea>
+      <idea>processVersionFactory.build() returns valid ProcessVersion with config</idea>
+    </ideas>
+  </tests>
+
+  <notes>
+    <critical>Process and ProcessVersion models ALREADY EXIST in prisma/schema.prisma (lines 122-165). Task 1 is verification only - DO NOT add duplicate models.</critical>
+    <critical>ID generators for proc_ and procv_ ALREADY EXIST in src/lib/id.ts. Ready to use.</critical>
+    <critical>Schema does NOT have categories field on Process - need to verify this is correct or add if missing.</critical>
+    <note>Use `upsert` operations in seed script for idempotency</note>
+    <note>Log plaintext API keys once during seed for developer reference</note>
+    <note>Test password for all seed users: "SeedPassword123!"</note>
+    <note>Add `tsx` to devDependencies if not present for running seed script</note>
+  </notes>
+</story-context>

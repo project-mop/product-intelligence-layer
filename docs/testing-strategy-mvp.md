@@ -38,7 +38,9 @@ tests/
 │       ├── tenant.factory.ts
 │       ├── user.factory.ts
 │       ├── audit-log.factory.ts
-│       └── api-key.factory.ts
+│       ├── api-key.factory.ts
+│       ├── process.factory.ts     # Process factory (Story 2.0)
+│       └── process-version.factory.ts  # ProcessVersion factory (Story 2.0)
 ├── setup.ts                       # Unit test setup
 └── setup.integration.ts           # Integration test setup (mocks NextAuth, audit service)
 ```
@@ -276,6 +278,8 @@ const { user, tenant } = await userFactory.createWithTenant();
 | `userFactory` | User | `build`, `create`, `createWithTenant`, `createMany` |
 | `auditLogFactory` | AuditLog | `build`, `create`, `createUserAction`, `createApiKeyAction` |
 | `apiKeyFactory` | ApiKey | `build`, `create`, `createForTenant`, `createMany` |
+| `processFactory` | Process | `build`, `create`, `createWithTenant`, `createMany` |
+| `processVersionFactory` | ProcessVersion | `build`, `create`, `createWithProcess`, `createMany`, `createProduction`, `createDeprecated` |
 
 Legacy helpers (unit tests only):
 - `createMockApiKey` — In-memory API key for unit tests

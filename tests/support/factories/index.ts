@@ -10,15 +10,17 @@
  *
  * @example
  * ```typescript
- * import { tenantFactory, userFactory, auditLogFactory } from "tests/support/factories";
+ * import { tenantFactory, userFactory, auditLogFactory, processFactory } from "tests/support/factories";
  *
  * // In-memory objects (unit tests)
  * const tenant = tenantFactory.build();
  * const user = userFactory.build({ tenantId: tenant.id });
+ * const process = processFactory.build({ tenantId: tenant.id });
  *
  * // Persisted objects (integration tests)
  * const tenant = await tenantFactory.create();
  * const user = await userFactory.create({ tenantId: tenant.id });
+ * const process = await processFactory.create({ tenantId: tenant.id });
  * ```
  */
 
@@ -34,6 +36,8 @@ export {
   createNonExpiringApiKey,
   resetIdCounter as resetApiKeyIdCounter,
 } from "./api-key.factory";
+export { processFactory } from "./process.factory";
+export { processVersionFactory } from "./process-version.factory";
 
 /**
  * Resets all factory counters.

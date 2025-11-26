@@ -40,6 +40,7 @@ model Tenant {
     callLogs      CallLog[]
     responseCache ResponseCache[]
     rateLimits    RateLimit[]
+    auditLogs     AuditLog[]
 
     @@index([deletedAt])
 }
@@ -264,4 +265,30 @@ model RateLimit {
     @@index([tenantId])
     @@index([tenantId, windowStart])
     @@index([windowStart])
+}
+
+// =============================================================================
+// AUDIT LOGGING
+// =============================================================================
+
+/// Audit logs for tracking significant tenant actions
+/// Immutable: no UPDATE or DELETE operations - enforced by service layer
+model AuditLog {
+    id         String   @id // audit_* prefix
+    tenantId   String
+    userId     String? // Optional: null for system-generated events
+    action     String // e.g., "user.created", "apiKey.revoked"
+    resource   String // e.g., "user", "apiKey"
+    resourceId String? // ID of the affected resource
+    metadata   Json? // Additional context (e.g., old key ID for rotation)
+    ipAddress  String? // Client IP address
+    userAgent  String? // Client user agent
+    createdAt  DateTime @default(now())
+
+    // Relations
+    tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+    @@index([tenantId])
+    @@index([tenantId, createdAt])
+    @@index([action])
 }

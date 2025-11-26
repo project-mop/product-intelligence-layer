@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 
 import { db } from "~/server/db";
+import { createAuditLog } from "~/server/services/audit";
 
 /**
  * Session max age in seconds (30 days default, configurable via env)
@@ -88,6 +89,30 @@ export const authConfig = {
     maxAge: SESSION_MAX_AGE,
   },
   callbacks: {
+    signIn: async ({ user }) => {
+      // Log user.login audit event on successful sign in
+      if (user.id) {
+        // Fetch tenantId for audit log
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { tenantId: true },
+        });
+
+        if (dbUser?.tenantId) {
+          // Fire-and-forget audit log (don't block sign in)
+          void createAuditLog({
+            tenantId: dbUser.tenantId,
+            userId: user.id,
+            action: "user.login",
+            resource: "user",
+            resourceId: user.id,
+            // Note: Request headers not available in NextAuth callback
+            // IP/userAgent tracking for login would require custom middleware
+          });
+        }
+      }
+      return true;
+    },
     session: async ({ session, user }) => {
       // Fetch tenantId from database since it's not part of the default User type
       const dbUser = await db.user.findUnique({

@@ -2,10 +2,15 @@
  * API Key Test Factory
  *
  * Generates test data for API key tests.
- * Uses deterministic patterns for reproducible tests.
+ * Provides both in-memory (build) and persisted (create) methods.
+ *
+ * @module tests/support/factories/api-key.factory
  */
 
-import type { ApiKey } from "../../../../generated/prisma";
+import type { ApiKey, Environment } from "../../../generated/prisma";
+import { generateApiKeyId } from "~/lib/id";
+import { testDb } from "../db";
+import { createHash, randomBytes } from "crypto";
 
 let idCounter = 0;
 
@@ -29,35 +34,125 @@ function generateTestHash(): string {
 }
 
 /**
+ * Generates a real API key and its hash for integration tests.
+ * Returns both the plaintext key and its SHA-256 hash.
+ */
+function generateRealKeyAndHash(environment: Environment): {
+  plainTextKey: string;
+  keyHash: string;
+} {
+  const envPrefix = environment === "PRODUCTION" ? "live" : "test";
+  const random = randomBytes(32).toString("hex");
+  const plainTextKey = `pil_${envPrefix}_${random}`;
+  const keyHash = createHash("sha256").update(plainTextKey).digest("hex");
+  return { plainTextKey, keyHash };
+}
+
+/**
  * Default API key data
  */
-const defaultApiKey: Omit<ApiKey, "id" | "tenantId" | "keyHash"> = {
-  name: "Test API Key",
+const defaultApiKey = (): Omit<ApiKey, "id" | "tenantId" | "keyHash"> => ({
+  name: `Test API Key ${idCounter + 1}`,
   scopes: ["process:*"],
   environment: "PRODUCTION",
   expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days from now
   revokedAt: null,
   lastUsedAt: null,
   createdAt: new Date(),
-};
+});
+
+/** Options for building/creating an API key */
+interface ApiKeyFactoryOptions extends Partial<ApiKey> {
+  tenantId?: string;
+}
 
 /**
- * Creates a mock API key record for testing.
+ * Creates a mock API key record for testing (in-memory only).
+ * Use this for unit tests that don't need database interaction.
  *
  * @param overrides - Partial ApiKey fields to override defaults
  * @returns Complete ApiKey object
  */
-export function createMockApiKey(
-  overrides: Partial<ApiKey> = {}
-): ApiKey {
+export function createMockApiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   return {
     id: generateTestId("key"),
     tenantId: generateTestId("ten"),
     keyHash: generateTestHash(),
-    ...defaultApiKey,
+    ...defaultApiKey(),
     ...overrides,
   };
 }
+
+/**
+ * Builds an API key object in memory without persisting.
+ * Alias for createMockApiKey for consistency with other factories.
+ */
+function build(overrides: ApiKeyFactoryOptions = {}): ApiKey {
+  return createMockApiKey(overrides);
+}
+
+/**
+ * Creates an API key and persists it to the test database.
+ * Use this for integration tests that need real database records.
+ *
+ * @param overrides - Partial ApiKey fields to override defaults
+ * @returns Promise resolving to { apiKey, plainTextKey }
+ */
+async function create(
+  overrides: ApiKeyFactoryOptions = {}
+): Promise<{ apiKey: ApiKey; plainTextKey: string }> {
+  const environment = overrides.environment ?? "PRODUCTION";
+  const { plainTextKey, keyHash } = generateRealKeyAndHash(environment);
+
+  const data = {
+    id: overrides.id ?? generateApiKeyId(),
+    tenantId: overrides.tenantId ?? generateTestId("ten"),
+    keyHash,
+    ...defaultApiKey(),
+    ...overrides,
+    environment,
+  };
+
+  const apiKey = await testDb.apiKey.create({ data });
+
+  return { apiKey, plainTextKey };
+}
+
+/**
+ * Creates an API key for an existing tenant.
+ * Convenience method that ensures tenantId is provided.
+ *
+ * @param tenantId - The tenant ID to create the key for
+ * @param overrides - Additional overrides
+ */
+async function createForTenant(
+  tenantId: string,
+  overrides: Partial<Omit<ApiKey, "tenantId">> = {}
+): Promise<{ apiKey: ApiKey; plainTextKey: string }> {
+  return create({ ...overrides, tenantId });
+}
+
+/**
+ * Creates multiple API keys for the same tenant.
+ */
+async function createMany(
+  count: number,
+  tenantId: string,
+  overrides: Partial<Omit<ApiKey, "id" | "tenantId">> = {}
+): Promise<Array<{ apiKey: ApiKey; plainTextKey: string }>> {
+  const results: Array<{ apiKey: ApiKey; plainTextKey: string }> = [];
+  for (let i = 0; i < count; i++) {
+    results.push(await createForTenant(tenantId, overrides));
+  }
+  return results;
+}
+
+export const apiKeyFactory = {
+  build,
+  create,
+  createForTenant,
+  createMany,
+};
 
 /**
  * Creates a mock API key with specific environment.

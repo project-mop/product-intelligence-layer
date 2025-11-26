@@ -1,10 +1,10 @@
 # Epic Technical Specification: Foundation & Infrastructure
 
 Date: 2025-11-25
-Updated: 2025-11-25 (Story 1.5 renumbering, encryption deferred)
+Updated: 2025-11-26 (Epic 1 complete with Story 1.6 test infrastructure)
 Author: Zac
 Epic ID: 1
-Status: In Progress (Stories 1.1-1.3 complete, 1.4 drafted, 1.5 pending)
+Status: Complete (Stories 1.1-1.6 all done)
 
 ---
 
@@ -52,6 +52,7 @@ This epic implements the core infrastructure layer from the architecture documen
 | Tenant isolation | Story 1.2 - RLS strategy documentation + application-level filtering |
 | API key management | Story 1.4 - Token CRUD operations |
 | Audit logging | Story 1.5 - Action logging foundation |
+| Test infrastructure | Story 1.6 - Testing framework setup (Vitest, Playwright) |
 
 **Key Architecture Decisions Applied:**
 - ADR-001: PostgreSQL as single data store (no Redis for MVP)
@@ -72,6 +73,8 @@ This epic implements the core infrastructure layer from the architecture documen
 | N8N Client | `src/server/services/n8n/client.ts` | Webhook triggers for email workflows |
 | Audit Service | `src/server/services/audit/` | Audit log writing (Story 1.5) |
 | ID Generator | `src/lib/id.ts` | Prefixed ID generation (ten_, usr_, key_, proc_, etc.) |
+| Test Utilities | `tests/support/` | Database, tRPC, and component test utilities (Story 1.6) |
+| Test Factories | `tests/support/factories/` | Test data factories for Tenant, User, ApiKey, AuditLog |
 
 ### Data Models and Contracts
 
@@ -362,8 +365,10 @@ interface ApiKeyContext {
 | Package | Purpose |
 |---------|---------|
 | prisma | Database migrations CLI |
-| vitest | Unit testing |
+| vitest | Unit and integration testing |
+| @vitest/coverage-v8 | Coverage reporting |
 | @testing-library/react | Component testing |
+| @playwright/test | E2E testing |
 | eslint | Linting |
 | prettier | Formatting |
 
@@ -420,6 +425,17 @@ interface ApiKeyContext {
 6. Audit logs are immutable (no UPDATE or DELETE operations)
 7. Audit logs are queryable by tenant_id and date range
 
+### Story 1.6: Test Infrastructure Setup
+
+1. Database mocking configured with test database isolation and automatic cleanup between tests
+2. tRPC test utilities provide `createAuthenticatedCaller()` and `createUnauthenticatedCaller()` helpers
+3. Test factories exist for Tenant, User, ApiKey, and AuditLog with `build()` and `create()` methods
+4. React Testing Library configured with proper providers (tRPC, session context)
+5. Playwright installed and configured for E2E testing with base test utilities
+6. GitHub Actions CI runs unit, integration, and E2E tests with PostgreSQL service
+7. Coverage reporting configured with 90% threshold for unit-testable code
+8. Testing patterns documented in `docs/testing-strategy-mvp.md`
+
 ## Traceability Mapping
 
 | AC | Spec Section | Component(s) | Test Approach |
@@ -429,6 +445,7 @@ interface ApiKeyContext {
 | 1.3.1-8 | Auth Flow, Security | NextAuth, bcrypt | Unit + integration tests |
 | 1.4.1-8 | API Key Service | apiKey router, service | Unit + integration tests |
 | 1.5.1-7 | Audit Service | audit module, AuditLog model | Integration tests |
+| 1.6.1-8 | Test Infrastructure | test utilities, factories, CI | CI verification |
 
 ## Risks, Assumptions, Open Questions
 
@@ -478,5 +495,18 @@ interface ApiKeyContext {
 ### Test Data Strategy
 
 - Use Prisma seed script for consistent test data
-- Separate test database (Railway dev environment or local Docker)
-- Clean database between test runs
+- Separate test database (local PostgreSQL with automatic cleanup)
+- Clean database between test runs via `resetDatabase()` utility
+- Test factories provide `build()` (in-memory) and `create()` (persisted) methods
+
+### Test Infrastructure (Story 1.6)
+
+| Test Type | Framework | Config File | Script |
+|-----------|-----------|-------------|--------|
+| Unit | Vitest | vitest.config.ts | `pnpm test:unit` |
+| Integration | Vitest | vitest.config.integration.ts | `pnpm test:integration` |
+| E2E | Playwright | playwright.config.ts | `pnpm test:e2e` |
+| Coverage | Vitest + v8 | vitest.config.ts | `pnpm test:coverage` |
+
+**Test Count:** 102 unit tests + 83 integration tests = 185 total tests
+**Coverage Target:** 90% for unit-testable code (routers excluded as integration-tested)

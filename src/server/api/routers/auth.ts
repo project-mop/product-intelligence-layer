@@ -13,6 +13,8 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { generateTenantId, generateUserId } from "~/lib/id";
 import { triggerWelcomeEmail, triggerPasswordResetEmail } from "~/server/services/n8n/client";
+import { createAuditLog } from "~/server/services/audit";
+import { extractRequestContext } from "~/server/services/audit/context";
 
 /**
  * bcrypt cost factor per security requirements
@@ -103,6 +105,20 @@ export const authRouter = createTRPCRouter({
       });
 
       return newUser;
+    });
+
+    // Extract request context for audit logging
+    const requestContext = extractRequestContext(ctx.headers);
+
+    // Log user.created audit event (fire-and-forget)
+    void createAuditLog({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "user.created",
+      resource: "user",
+      resourceId: user.id,
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
     });
 
     // Trigger welcome email via N8N (fire-and-forget)

@@ -18,6 +18,8 @@ import {
   listApiKeys,
   updateApiKeyName,
 } from "~/server/services/auth/api-key";
+import { createAuditLog } from "~/server/services/audit";
+import { extractRequestContext } from "~/server/services/audit/context";
 
 /**
  * Input schema for creating a new API key.
@@ -104,6 +106,20 @@ export const apiKeyRouter = createTRPCRouter({
         expiresAt: input.expiresAt,
       });
 
+      // Extract request context for audit logging
+      const requestContext = extractRequestContext(ctx.headers);
+
+      // Log apiKey.created audit event (fire-and-forget)
+      void createAuditLog({
+        tenantId,
+        userId: ctx.session.user.id,
+        action: "apiKey.created",
+        resource: "apiKey",
+        resourceId: result.apiKey.id,
+        ipAddress: requestContext.ipAddress,
+        userAgent: requestContext.userAgent,
+      });
+
       return {
         apiKey: {
           id: result.apiKey.id,
@@ -141,9 +157,25 @@ export const apiKeyRouter = createTRPCRouter({
       }
 
       try {
+        const oldKeyId = input.id;
         const result = await rotateApiKey({
-          keyId: input.id,
+          keyId: oldKeyId,
           tenantId,
+        });
+
+        // Extract request context for audit logging
+        const requestContext = extractRequestContext(ctx.headers);
+
+        // Log apiKey.rotated audit event with old key ID in metadata (fire-and-forget)
+        void createAuditLog({
+          tenantId,
+          userId: ctx.session.user.id,
+          action: "apiKey.rotated",
+          resource: "apiKey",
+          resourceId: result.apiKey.id,
+          metadata: { oldKeyId },
+          ipAddress: requestContext.ipAddress,
+          userAgent: requestContext.userAgent,
         });
 
         return {
@@ -194,6 +226,20 @@ export const apiKeyRouter = createTRPCRouter({
         await revokeApiKey({
           keyId: input.id,
           tenantId,
+        });
+
+        // Extract request context for audit logging
+        const requestContext = extractRequestContext(ctx.headers);
+
+        // Log apiKey.revoked audit event (fire-and-forget)
+        void createAuditLog({
+          tenantId,
+          userId: ctx.session.user.id,
+          action: "apiKey.revoked",
+          resource: "apiKey",
+          resourceId: input.id,
+          ipAddress: requestContext.ipAddress,
+          userAgent: requestContext.userAgent,
         });
 
         return { success: true };

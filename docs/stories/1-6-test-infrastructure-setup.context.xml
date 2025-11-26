@@ -1,0 +1,251 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>6</storyId>
+    <title>Test Infrastructure Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-6-test-infrastructure-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a comprehensive test infrastructure with database mocking, component testing utilities, and E2E test scaffolding</iWant>
+    <soThat>Epic 2+ stories can be developed with proper test coverage including UI components and integration tests</soThat>
+    <tasks>
+      <task id="1" ac="1">Database Test Infrastructure - Create tests/support/db.ts with resetDatabase(), beforeEach hook, test DB isolation</task>
+      <task id="2" ac="2">tRPC Test Caller Utilities - Create tests/support/trpc.ts with createAuthenticatedCaller(), createUnauthenticatedCaller()</task>
+      <task id="3" ac="3">Test Data Factories - Create tenant.factory.ts, user.factory.ts, audit-log.factory.ts, update api-key.factory.ts, create index.ts</task>
+      <task id="4" ac="4">React Component Test Setup - Create tests/support/render.tsx with QueryClientProvider, session provider wrapper</task>
+      <task id="5" ac="5">Playwright E2E Configuration - Install Playwright, create playwright.config.ts, example.spec.ts, add npm scripts</task>
+      <task id="6" ac="6">GitHub Actions CI Integration - Update ci.yml with PostgreSQL service, test commands, E2E job</task>
+      <task id="7" ac="7">Coverage Configuration - Update vitest.config.ts with 50% threshold, add coverage to CI</task>
+      <task id="8" ac="8">Testing Strategy Documentation - Create docs/testing-strategy-mvp.md with all patterns documented</task>
+      <task id="9" ac="1-8">Verification - typecheck, lint, test, test:e2e, test:coverage, CI workflow</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Database Mocking: Test database isolation using in-memory or test-specific PostgreSQL with automatic cleanup between tests</ac>
+    <ac id="2">tRPC Test Utilities: Helper functions to create authenticated tRPC callers with mocked sessions for router testing</ac>
+    <ac id="3">Test Factories: Factory functions for creating test data (Tenant, User, AuditLog, and placeholder for Process entities)</ac>
+    <ac id="4">Component Testing: React Testing Library configured with proper providers (tRPC, session context) for component unit tests</ac>
+    <ac id="5">Playwright E2E Setup: Playwright installed and configured with base test utilities for end-to-end testing</ac>
+    <ac id="6">CI Integration: Test commands verified working in GitHub Actions (test, test:e2e with appropriate database setup)</ac>
+    <ac id="7">Test Coverage Baseline: Coverage reporting configured with 50% minimum threshold for new code per testing strategy</ac>
+    <ac id="8">Documentation: Testing patterns documented in docs/testing-strategy-mvp.md for dev agent reference</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Decision Summary - Testing</section>
+        <snippet>Testing (Unit): Vitest 4.x - Fast, ESM-native, browser mode. Testing (E2E): Playwright 1.56.x - Cross-browser, free. Test structure: tests/unit/, tests/integration/, tests/e2e/</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Project Structure</section>
+        <snippet>Tests organized under tests/ directory with unit/, integration/, and e2e/ subdirectories. Coverage target: 50% minimum for MVP.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>tRPC Patterns</section>
+        <snippet>Use protectedProcedure for authenticated routes. Resource-based router naming. Always use Zod for input validation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 1: Foundation and Infrastructure</section>
+        <snippet>Epic 1 establishes foundation infrastructure. Story 1.6 (test infrastructure) is a prep story before Epic 2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Tech Spec</title>
+        <section>Testing Strategy</section>
+        <snippet>Vitest for unit/integration, Playwright for E2E. Co-locate tests with source or in tests/. Coverage threshold 50%.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-5-audit-logging-foundation.md</path>
+        <title>Previous Story</title>
+        <section>Dev Agent Record</section>
+        <snippet>93 tests pass. Factory pattern in tests/support/factories/api-key.factory.ts. Tests in tests/unit/*.test.ts naming convention.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-28</lines>
+        <reason>Vitest configuration - needs coverage thresholds, setup files update</reason>
+      </artifact>
+      <artifact>
+        <path>tests/setup.ts</path>
+        <kind>test-setup</kind>
+        <symbol>global setup</symbol>
+        <lines>1-19</lines>
+        <reason>Global test setup - needs database reset hook, additional config</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/api-key.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>createMockApiKey</symbol>
+        <lines>1-117</lines>
+        <reason>Existing factory pattern to follow for new factories (tenant, user, audit-log)</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/api/trpc.ts</path>
+        <kind>trpc-config</kind>
+        <symbol>createTRPCContext, createCallerFactory, protectedProcedure</symbol>
+        <lines>1-134</lines>
+        <reason>tRPC context and caller factory - base for test caller utilities</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/api/root.ts</path>
+        <kind>router</kind>
+        <symbol>appRouter, createCaller</symbol>
+        <lines>1-30</lines>
+        <reason>App router definition - needed for test caller setup</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/db.ts</path>
+        <kind>database</kind>
+        <symbol>db</symbol>
+        <lines>all</lines>
+        <reason>Prisma client instance - needed for test database utilities</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>workflow</kind>
+        <symbol>CI workflow</symbol>
+        <lines>1-42</lines>
+        <reason>Current CI workflow - needs PostgreSQL service, test commands, E2E job</reason>
+      </artifact>
+      <artifact>
+        <path>prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>Tenant, User, ApiKey, AuditLog</symbol>
+        <lines>1-294</lines>
+        <reason>Database models - factories need to match these schemas</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/id.ts</path>
+        <kind>utility</kind>
+        <symbol>generateId</symbol>
+        <lines>all</lines>
+        <reason>ID generation utility - factories should use this for consistent prefixed IDs</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/auth.test.ts</path>
+        <kind>test</kind>
+        <symbol>auth tests</symbol>
+        <lines>all</lines>
+        <reason>Existing test patterns to maintain consistency</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/audit.test.ts</path>
+        <kind>test</kind>
+        <symbol>audit tests</symbol>
+        <lines>all</lines>
+        <reason>Latest test patterns from Story 1.5 - 21 tests</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="vitest" version="^4.0.14" type="devDependency">Unit/integration test framework</package>
+        <package name="@testing-library/react" version="^16.3.0" type="devDependency">React component testing</package>
+        <package name="@testing-library/dom" version="^10.4.1" type="devDependency">DOM testing utilities</package>
+        <package name="jsdom" version="^27.2.0" type="devDependency">Browser environment for tests</package>
+        <package name="@vitejs/plugin-react" version="^5.1.1" type="devDependency">React plugin for Vite/Vitest</package>
+        <package name="@playwright/test" version="TODO" type="devDependency">E2E testing framework - TO BE INSTALLED</package>
+        <package name="prisma" version="^7.0.1" type="devDependency">Database ORM</package>
+        <package name="@prisma/client" version="^7.0.1" type="dependency">Prisma client</package>
+        <package name="@trpc/server" version="^11.0.0" type="dependency">tRPC server</package>
+        <package name="next-auth" version="5.0.0-beta.25" type="dependency">Authentication</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="docs/architecture.md">Use Vitest 4.x for unit/integration tests, Playwright for E2E</constraint>
+    <constraint source="docs/architecture.md">Test structure: tests/unit/, tests/integration/, tests/e2e/</constraint>
+    <constraint source="docs/architecture.md">Coverage target: 50% minimum for MVP</constraint>
+    <constraint source="docs/architecture.md">File naming: kebab-case for files, PascalCase for React components</constraint>
+    <constraint source="docs/architecture.md">ID format: All entities use prefixed format (ten_*, usr_*, key_*, audit_*)</constraint>
+    <constraint source="existing-code">Factories should provide build() (memory) and create() (persisted) methods</constraint>
+    <constraint source="existing-code">tRPC callers need session context with user.id and user.tenantId</constraint>
+    <constraint source="existing-code">Prisma client output at generated/prisma - imports use relative paths</constraint>
+    <constraint source="ci.yml">CI uses pnpm 9, Node 20, dummy DATABASE_URL for Prisma generate</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>createCallerFactory</name>
+      <kind>function</kind>
+      <signature>createCallerFactory(router: AppRouter) => (ctx: TRPCContext) => Caller</signature>
+      <path>src/server/api/trpc.ts:65</path>
+    </interface>
+    <interface>
+      <name>createTRPCContext</name>
+      <kind>function</kind>
+      <signature>createTRPCContext(opts: { headers: Headers }) => Promise&lt;{ db, session, headers }&gt;</signature>
+      <path>src/server/api/trpc.ts:29-37</path>
+    </interface>
+    <interface>
+      <name>protectedProcedure</name>
+      <kind>tRPC procedure</kind>
+      <signature>t.procedure.use(timingMiddleware).use(authMiddleware)</signature>
+      <path>src/server/api/trpc.ts:121-133</path>
+    </interface>
+    <interface>
+      <name>appRouter</name>
+      <kind>tRPC router</kind>
+      <signature>createTRPCRouter({ apiKey, auditLog, auth, post })</signature>
+      <path>src/server/api/root.ts:12-17</path>
+    </interface>
+    <interface>
+      <name>generateId</name>
+      <kind>function</kind>
+      <signature>generateId(prefix: string) => string</signature>
+      <path>src/lib/id.ts</path>
+    </interface>
+    <interface>
+      <name>db (Prisma)</name>
+      <kind>singleton</kind>
+      <signature>PrismaClient with Tenant, User, ApiKey, AuditLog, Process, etc.</signature>
+      <path>src/server/db.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest 4.x for unit and integration tests with jsdom environment. Playwright for E2E tests.
+      Test files use *.test.ts naming for unit/integration, *.spec.ts for E2E.
+      Tests located in tests/unit/, tests/integration/, tests/e2e/ directories.
+      Coverage threshold: 50% minimum for MVP. Use factories for test data generation.
+      Reset mocks after each test (already in setup.ts). Database cleanup required for integration tests.
+    </standards>
+    <locations>
+      <location>tests/unit/*.test.ts</location>
+      <location>tests/integration/**/*.test.ts</location>
+      <location>tests/e2e/*.spec.ts</location>
+      <location>tests/support/factories/*.factory.ts</location>
+      <location>tests/support/*.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test database cleanup: verify two tests don't share state, verify truncation works for all tables</idea>
+      <idea ac="2">tRPC caller: test authenticated caller returns routers, unauthenticated caller throws UNAUTHORIZED</idea>
+      <idea ac="3">Factory tests: verify each factory generates valid schema-compliant data, verify build vs create</idea>
+      <idea ac="4">Component render: test custom render provides context, test session mocking works</idea>
+      <idea ac="5">E2E smoke: test homepage loads, test basic navigation works</idea>
+      <idea ac="6">CI: verify test job runs, verify E2E job runs (may be skipped initially)</idea>
+      <idea ac="7">Coverage: verify thresholds are enforced, verify excluded files are correct</idea>
+      <idea ac="8">Documentation: manual review - patterns are clear and follow examples</idea>
+    </ideas>
+  </tests>
+</story-context>

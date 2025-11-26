@@ -1,0 +1,247 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>5</storyId>
+    <title>Audit Logging Foundation</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-5-audit-logging-foundation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>platform operator</asA>
+    <iWant>all significant tenant actions logged for audit purposes</iWant>
+    <soThat>we can investigate issues and demonstrate compliance</soThat>
+    <tasks>
+      <task id="1" title="Create AuditLog Prisma Model" ac="1-6">
+        <subtask>Add AuditLog model to prisma/schema.prisma per tech spec</subtask>
+        <subtask>Fields: id, tenantId, userId, action, resource, resourceId, metadata (Json), ipAddress, userAgent, createdAt</subtask>
+        <subtask>Add indexes on tenantId, (tenantId + createdAt), and action</subtask>
+        <subtask>Add relation to Tenant model</subtask>
+        <subtask>Run pnpm prisma db push to apply schema</subtask>
+      </task>
+      <task id="2" title="Create Audit Service" ac="1-7">
+        <subtask>Create src/server/services/audit/index.ts</subtask>
+        <subtask>Implement createAuditLog(params) function</subtask>
+        <subtask>Parameters: tenantId, userId (optional), action, resource, resourceId (optional), metadata (optional), ipAddress (optional), userAgent (optional)</subtask>
+        <subtask>Service is append-only - no update/delete methods exposed</subtask>
+        <subtask>Use generateId("audit") for audit log IDs - add "audit" prefix to src/lib/id.ts</subtask>
+      </task>
+      <task id="3" title="Create Request Context Helper" ac="6">
+        <subtask>Create src/server/services/audit/context.ts</subtask>
+        <subtask>Implement extractRequestContext(headers: Headers) function</subtask>
+        <subtask>Extract IP address from x-forwarded-for or x-real-ip headers</subtask>
+        <subtask>Extract user agent from user-agent header</subtask>
+        <subtask>Return typed AuditRequestContext object</subtask>
+      </task>
+      <task id="4" title="Integrate Audit Logging into Auth Router" ac="1,2">
+        <subtask>Update src/server/api/routers/auth.ts signup procedure</subtask>
+        <subtask>Log "user.created" after successful user creation</subtask>
+        <subtask>Update login flow to log "user.login" on successful authentication</subtask>
+        <subtask>Pass request context (IP, user agent) from tRPC context</subtask>
+      </task>
+      <task id="5" title="Integrate Audit Logging into API Key Router" ac="3,4,5">
+        <subtask>Update src/server/api/routers/apiKey.ts create procedure</subtask>
+        <subtask>Log "apiKey.created" with key_id as resourceId</subtask>
+        <subtask>Update rotate procedure to log "apiKey.rotated" with old key_id in metadata</subtask>
+        <subtask>Update revoke procedure to log "apiKey.revoked"</subtask>
+        <subtask>Pass request context from tRPC context</subtask>
+      </task>
+      <task id="6" title="Create Audit Log Query Router" ac="8">
+        <subtask>Create src/server/api/routers/auditLog.ts</subtask>
+        <subtask>Implement list query - returns audit logs for tenant with pagination</subtask>
+        <subtask>Input: dateFrom (optional), dateTo (optional), action (optional), limit (default 50), cursor (optional)</subtask>
+        <subtask>Filter by tenant_id automatically from session</subtask>
+        <subtask>Register router in src/server/api/root.ts</subtask>
+      </task>
+      <task id="7" title="Testing" ac="1-8">
+        <subtask>Unit tests for audit service (createAuditLog function)</subtask>
+        <subtask>Unit tests for request context extraction</subtask>
+        <subtask>Unit tests for audit log query with filtering</subtask>
+        <subtask>Test immutability - verify no update/delete methods</subtask>
+        <subtask>Add "audit" prefix mapping to id.test.ts</subtask>
+      </task>
+      <task id="8" title="Verification" ac="1-8">
+        <subtask>Run pnpm typecheck - zero errors</subtask>
+        <subtask>Run pnpm lint - zero warnings</subtask>
+        <subtask>Run pnpm build - successful build</subtask>
+        <subtask>Run pnpm test - all tests pass</subtask>
+        <subtask>Verify audit entries created for signup, login, key operations</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">User signup creates an audit log entry with timestamp, tenant_id, user_id, action ("user.created"), resource ("user"), resource_id</criterion>
+    <criterion id="2">User login creates an audit log entry with action ("user.login")</criterion>
+    <criterion id="3">API key creation creates an audit log entry with action ("apiKey.created"), including key_id in resource_id</criterion>
+    <criterion id="4">API key rotation creates an audit log entry with action ("apiKey.rotated"), including old key_id in metadata</criterion>
+    <criterion id="5">API key revocation creates an audit log entry with action ("apiKey.revoked")</criterion>
+    <criterion id="6">Audit logs include IP address and user agent from request headers</criterion>
+    <criterion id="7">Audit logs are immutable (no UPDATE or DELETE operations allowed - enforced by service)</criterion>
+    <criterion id="8">Audit logs are queryable by tenant_id and date range via tRPC procedure</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-1.md" title="Epic 1 Tech Spec" section="Story 1.5: Audit Logging Foundation">
+        Defines AuditLog model schema, acceptance criteria, and traceability mapping for audit logging.
+      </doc>
+      <doc path="docs/tech-spec-epic-1.md" title="Epic 1 Tech Spec" section="Data Models and Contracts">
+        Complete Prisma schema for AuditLog model with fields and indexes.
+      </doc>
+      <doc path="docs/epics.md" title="Epics Document" section="Story 1.5: Audit Logging Foundation">
+        User story, acceptance criteria in Given/When/Then format, prerequisites (Story 1.3).
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Logging Strategy">
+        Structured logging format (JSON), privacy-safe logging requirements, no PII in logs.
+      </doc>
+      <doc path="docs/stories/1-4-api-token-management.md" title="Story 1.4" section="Task 5">
+        Deferred audit logging task with expected actions: apiKey.created, apiKey.rotated, apiKey.revoked.
+      </doc>
+      <doc path="docs/stories/1-3-user-authentication-system.md" title="Story 1.3" section="Dev Agent Record">
+        Service pattern reference for new services. Auth router location for signup audit integration.
+      </doc>
+    </docs>
+    <code>
+      <file path="prisma/schema.prisma" kind="schema" reason="Add AuditLog model with fields, indexes, and Tenant relation">
+        <note>Tenant model already exists - add auditLogs relation</note>
+      </file>
+      <file path="src/lib/id.ts" kind="utility" symbol="ID_PREFIXES, generateId" lines="1-119" reason="Add 'audit' prefix for audit log ID generation">
+        <interface>
+          export const ID_PREFIXES = { tenant: "ten", user: "usr", process: "proc", processVersion: "procv", apiKey: "key", request: "req" }
+          export function generateId(prefix: IdPrefix, length?: number): string
+        </interface>
+      </file>
+      <file path="src/server/api/routers/auth.ts" kind="router" symbol="authRouter" lines="1-256" reason="Integrate audit logging into signup procedure">
+        <interface>
+          signup: publicProcedure.input(signupInput).mutation(...)
+          requestPasswordReset: publicProcedure.input(...).mutation(...)
+          resetPassword: publicProcedure.input(...).mutation(...)
+        </interface>
+      </file>
+      <file path="src/server/api/routers/apiKey.ts" kind="router" symbol="apiKeyRouter" lines="1-256" reason="Integrate audit logging into create, rotate, revoke procedures">
+        <interface>
+          list: protectedProcedure.query(...)
+          create: protectedProcedure.input(createKeyInput).mutation(...)
+          rotate: protectedProcedure.input(keyIdInput).mutation(...)
+          revoke: protectedProcedure.input(keyIdInput).mutation(...)
+          update: protectedProcedure.input(updateKeyInput).mutation(...)
+        </interface>
+      </file>
+      <file path="src/server/api/root.ts" kind="router" symbol="appRouter" lines="1-28" reason="Register auditLog router">
+        <interface>
+          export const appRouter = createTRPCRouter({ apiKey, auth, post, /* add auditLog */ })
+        </interface>
+      </file>
+      <file path="src/server/api/trpc.ts" kind="context" symbol="protectedProcedure" reason="Reference for protected procedure pattern and session access">
+        <note>Use ctx.session.user.tenantId for tenant-scoped operations</note>
+      </file>
+      <file path="src/server/services/n8n/client.ts" kind="service" symbol="sendWebhook, triggerWelcomeEmail" lines="1-112" reason="Reference pattern for new services (fire-and-forget async)">
+        <note>Follow this pattern for audit service</note>
+      </file>
+      <file path="src/server/db.ts" kind="database" symbol="db" reason="Prisma client singleton for database operations" />
+    </code>
+    <dependencies>
+      <node>
+        <package name="@prisma/client" version="^7.0.1" />
+        <package name="@trpc/server" version="^11.0.0" />
+        <package name="zod" version="^3.24.2" />
+        <package name="next-auth" version="5.0.0-beta.25" />
+        <package name="vitest" version="^4.0.14" dev="true" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Follow existing service pattern from src/server/services/n8n/client.ts</constraint>
+    <constraint type="pattern">Use protectedProcedure for authenticated routes per src/server/api/trpc.ts</constraint>
+    <constraint type="pattern">Use Zod schemas for all tRPC input validation</constraint>
+    <constraint type="security">Audit logs must be immutable - service exposes only createAuditLog(), no update/delete</constraint>
+    <constraint type="security">Always include tenantId in WHERE clauses - derive from session, never trust client input</constraint>
+    <constraint type="naming">Action format: {resource}.{verb} (e.g., "user.created", "apiKey.rotated")</constraint>
+    <constraint type="naming">ID format: audit_* prefix using generateId(ID_PREFIXES.audit)</constraint>
+    <constraint type="testing">Minimum 50% test coverage per testing strategy</constraint>
+    <constraint type="verification">All verification commands must pass: pnpm typecheck, pnpm lint, pnpm build, pnpm test</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="AuditLog Model" kind="prisma model" path="prisma/schema.prisma">
+      model AuditLog {
+        id         String   @id // audit_* prefix
+        tenantId   String
+        tenant     Tenant   @relation(fields: [tenantId], references: [id])
+        userId     String?
+        action     String   // e.g., "user.created", "apiKey.revoked"
+        resource   String   // e.g., "user", "apiKey"
+        resourceId String?
+        metadata   Json?    // Additional context (e.g., old key ID for rotation)
+        ipAddress  String?
+        userAgent  String?
+        createdAt  DateTime @default(now())
+
+        @@index([tenantId])
+        @@index([tenantId, createdAt])
+        @@index([action])
+      }
+    </interface>
+    <interface name="createAuditLog" kind="function" path="src/server/services/audit/index.ts">
+      interface CreateAuditLogParams {
+        tenantId: string;
+        userId?: string;
+        action: string;
+        resource: string;
+        resourceId?: string;
+        metadata?: Record&lt;string, unknown&gt;;
+        ipAddress?: string;
+        userAgent?: string;
+      }
+      export async function createAuditLog(params: CreateAuditLogParams): Promise&lt;AuditLog&gt;
+    </interface>
+    <interface name="extractRequestContext" kind="function" path="src/server/services/audit/context.ts">
+      interface AuditRequestContext {
+        ipAddress?: string;
+        userAgent?: string;
+      }
+      export function extractRequestContext(headers: Headers): AuditRequestContext
+    </interface>
+    <interface name="auditLogRouter.list" kind="tRPC query" path="src/server/api/routers/auditLog.ts">
+      list: protectedProcedure
+        .input(z.object({
+          dateFrom: z.date().optional(),
+          dateTo: z.date().optional(),
+          action: z.string().optional(),
+          limit: z.number().default(50),
+          cursor: z.string().optional()
+        }))
+        .query(...)
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest for unit testing. Tests are co-located in tests/unit/ directory. Follow existing patterns from tests/unit/api-key.test.ts and tests/unit/auth.test.ts. Use test factories from tests/support/factories/ for generating test data. Minimum 50% coverage target for MVP.
+    </standards>
+    <locations>
+      <location>tests/unit/*.test.ts</location>
+      <location>tests/support/factories/*.factory.ts</location>
+      <location>tests/setup.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test createAuditLog creates entry with correct user.created action on signup</idea>
+      <idea ac="2">Test createAuditLog creates entry with user.login action</idea>
+      <idea ac="3">Test createAuditLog creates entry with apiKey.created and correct resourceId</idea>
+      <idea ac="4">Test createAuditLog creates entry with apiKey.rotated and old key ID in metadata</idea>
+      <idea ac="5">Test createAuditLog creates entry with apiKey.revoked action</idea>
+      <idea ac="6">Test extractRequestContext extracts IP from x-forwarded-for header</idea>
+      <idea ac="6">Test extractRequestContext extracts user agent from user-agent header</idea>
+      <idea ac="7">Test audit service only exposes createAuditLog (no update/delete methods)</idea>
+      <idea ac="8">Test auditLog.list returns logs filtered by tenantId</idea>
+      <idea ac="8">Test auditLog.list filters by dateFrom and dateTo</idea>
+      <idea ac="8">Test auditLog.list filters by action</idea>
+      <idea ac="8">Test auditLog.list pagination with cursor</idea>
+      <idea>Test generateId("audit") produces audit_* prefixed IDs</idea>
+    </ideas>
+  </tests>
+</story-context>

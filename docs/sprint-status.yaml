@@ -41,9 +41,10 @@ development_status:
   1-2-multi-tenant-database-schema: done
   1-3-user-authentication-system: done
   1-4-api-token-management: done
-  1-5-audit-logging-foundation: backlog  # was 1-6, renumbered after 1-5 deferred
+  1-5-audit-logging-foundation: done  # was 1-6, renumbered after 1-5 deferred
   # Note: Story 1.5 (Tenant Encryption at Rest) deferred to Growth phase
-  epic-1-retrospective: optional
+  1-6-test-infrastructure-setup: done  # PREP: Required before Epic 2 for integration/E2E testing
+  epic-1-retrospective: done
 
   # Epic 2: Intelligence Definition (7 stories - added Story 2.0)
   epic-2: backlog

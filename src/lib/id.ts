@@ -17,6 +17,7 @@ export const ID_PREFIXES = {
   processVersion: "procv",
   apiKey: "key",
   request: "req",
+  audit: "audit",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
@@ -85,6 +86,14 @@ export function generateApiKeyId(): string {
  */
 export function generateRequestId(): string {
   return generateId(ID_PREFIXES.request);
+}
+
+/**
+ * Generates an audit log ID.
+ * @returns ID with "audit_" prefix
+ */
+export function generateAuditId(): string {
+  return generateId(ID_PREFIXES.audit);
 }
 
 /**

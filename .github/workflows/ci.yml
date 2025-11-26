@@ -24,6 +24,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          # Dummy URL for Prisma generate during postinstall (no actual connection made)
+          DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
 
       - name: Run typecheck
         run: pnpm typecheck

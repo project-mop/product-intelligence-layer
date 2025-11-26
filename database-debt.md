@@ -36,6 +36,26 @@ This is a temporary setup. Before deploying to production or sharing the project
 
 The local services are NOT accessible to other developers or CI/CD pipelines.
 
+### CI/CD Database Configuration
+
+The CI workflow (`.github/workflows/ci.yml`) uses a **dummy `DATABASE_URL`** during the install step:
+
+```yaml
+env:
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+```
+
+**Why this is needed:**
+- `pnpm install` triggers `postinstall` → `prisma generate`
+- Prisma 7's `prisma.config.ts` uses `env("DATABASE_URL")` which throws if the variable is missing
+- `prisma generate` only generates the client code — it does NOT connect to the database
+- The dummy URL satisfies Prisma's env validation without requiring a real database
+
+**Important:** This is safe because:
+1. No actual database connection is attempted during `prisma generate`
+2. The CI workflow does not run migrations or database operations
+3. Production deployments should use GitHub Secrets for real `DATABASE_URL`
+
 ### Local Services Created
 
 | Service | Installation Method | Status | Management Commands |

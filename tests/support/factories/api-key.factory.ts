@@ -8,6 +8,7 @@
  */
 
 import type { ApiKey, Environment } from "../../../generated/prisma";
+import { Prisma } from "../../../generated/prisma";
 import { generateApiKeyId } from "~/lib/id";
 import { testDb } from "../db";
 import { createHash, randomBytes } from "crypto";
@@ -104,7 +105,7 @@ async function create(
   const environment = overrides.environment ?? "PRODUCTION";
   const { plainTextKey, keyHash } = generateRealKeyAndHash(environment);
 
-  const data = {
+  const baseData = {
     id: overrides.id ?? generateApiKeyId(),
     tenantId: overrides.tenantId ?? generateTestId("ten"),
     keyHash,
@@ -113,7 +114,12 @@ async function create(
     environment,
   };
 
-  const apiKey = await testDb.apiKey.create({ data });
+  const apiKey = await testDb.apiKey.create({
+    data: {
+      ...baseData,
+      scopes: baseData.scopes === null ? Prisma.JsonNull : baseData.scopes,
+    },
+  });
 
   return { apiKey, plainTextKey };
 }

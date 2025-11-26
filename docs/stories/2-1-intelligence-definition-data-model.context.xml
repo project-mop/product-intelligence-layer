@@ -1,0 +1,196 @@
+<story-context id="2-1-intelligence-definition-data-model" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>1</storyId>
+    <title>Intelligence Definition Data Model</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-1-intelligence-definition-data-model.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a tRPC router and service layer for intelligence definition CRUD operations</iWant>
+    <soThat>users can create, read, update, delete, and duplicate intelligence definitions through the API</soThat>
+    <tasks>
+      <task id="1">Create process router structure (AC: 1, 8)</task>
+      <task id="2">Implement Zod schemas for input validation (AC: 9, 11)</task>
+      <task id="3">Implement list procedure (AC: 2, 8)</task>
+      <task id="4">Implement get procedure (AC: 3, 8)</task>
+      <task id="5">Implement create procedure (AC: 4, 8, 10)</task>
+      <task id="6">Implement update procedure (AC: 5, 8, 10)</task>
+      <task id="7">Implement duplicate procedure (AC: 6, 8, 10)</task>
+      <task id="8">Implement delete procedure (AC: 7, 8, 10)</task>
+      <task id="9">Add restore procedure (bonus) (AC: 7)</task>
+      <task id="10">Write integration tests (AC: 1-11)</task>
+      <task id="11">Verification - typecheck, lint, tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Process Router Exists: tRPC router at src/server/api/routers/process.ts with CRUD procedures</criterion>
+    <criterion id="2">List Procedure: process.list returns all non-deleted processes for the authenticated user's tenant with optional filtering by status and search</criterion>
+    <criterion id="3">Get Procedure: process.get returns a single process with its versions, filtered by tenant</criterion>
+    <criterion id="4">Create Procedure: process.create creates a new Process and initial ProcessVersion (SANDBOX environment) in a transaction</criterion>
+    <criterion id="5">Update Procedure: process.update modifies process metadata (name, description, inputSchema, outputSchema)</criterion>
+    <criterion id="6">Duplicate Procedure: process.duplicate deep copies a process with "(Copy)" suffix and creates a new SANDBOX version</criterion>
+    <criterion id="7">Delete Procedure: process.delete performs soft delete (sets deletedAt timestamp)</criterion>
+    <criterion id="8">Tenant Isolation: All procedures enforce tenant isolation via session context (no cross-tenant access)</criterion>
+    <criterion id="9">Input Validation: All procedures use Zod schemas for input validation matching the tech spec</criterion>
+    <criterion id="10">Audit Logging: Create, update, duplicate, and delete operations write audit log entries</criterion>
+    <criterion id="11">JSON Schema Validation: inputSchema and outputSchema are validated as valid JSON Schema Draft 7</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture" section="tRPC Patterns">
+        Defines router structure, naming conventions (resource-based routers), protectedProcedure pattern, and tenant isolation via session context.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Permission Checking Patterns">
+        Documents tenant isolation patterns - always filter by tenantId from session, never trust client input. Example code for protectedProcedure implementation.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Data Architecture">
+        Entity relationship diagram showing Process and ProcessVersion models with tenant relationships and JSON schema columns.
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Tech Spec Epic 2" section="APIs and Interfaces">
+        Defines tRPC procedure signatures for process.list, process.get, process.create, process.update, process.duplicate, process.delete, process.restore.
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Tech Spec Epic 2" section="Data Models and Contracts">
+        ProcessConfig TypeScript interface with LLM settings, caching, rate limiting configurations.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="tRPC Router Tests">
+        Integration test patterns using createAuthenticatedCaller and createUnauthenticatedCaller. Factory usage with tenantFactory, userFactory.
+      </doc>
+      <doc path="docs/stories/2-0-development-seed-data.md" title="Story 2.0" section="Completion Notes">
+        Confirms processFactory and processVersionFactory exist. Notes Environment enum (SANDBOX/PRODUCTION) usage.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="src/server/api/routers/apiKey.ts" kind="router" symbol="apiKeyRouter" reason="Reference pattern for tRPC router structure with CRUD operations, Zod input schemas, tenant isolation, and audit logging integration">
+        <lines>1-301</lines>
+      </file>
+      <file path="src/server/api/root.ts" kind="router-aggregator" symbol="appRouter" reason="Where processRouter must be registered">
+        <lines>1-29</lines>
+      </file>
+      <file path="src/server/api/trpc.ts" kind="trpc-setup" symbol="protectedProcedure" reason="Base procedure with auth middleware that provides ctx.session.user">
+        <lines>121-133</lines>
+      </file>
+      <file path="src/lib/id.ts" kind="utility" symbol="generateProcessId, generateProcessVersionId" reason="ID generation functions for proc_* and procv_* prefixed IDs">
+        <lines>59-73</lines>
+      </file>
+      <file path="src/server/services/audit/index.ts" kind="service" symbol="createAuditLog" reason="Audit logging service to record process.created, process.updated, etc. events">
+        <lines>all</lines>
+      </file>
+      <file path="src/server/services/audit/context.ts" kind="utility" symbol="extractRequestContext" reason="Extracts IP address and user agent from request headers for audit logs">
+        <lines>all</lines>
+      </file>
+      <file path="prisma/schema.prisma" kind="schema" symbol="Process, ProcessVersion, Environment" reason="Database schema with Process and ProcessVersion models, JSON columns for schemas">
+        <lines>119-165</lines>
+      </file>
+      <file path="tests/support/trpc.ts" kind="test-utility" symbol="createAuthenticatedCaller, createUnauthenticatedCaller" reason="Test helpers for creating tRPC callers with mock sessions">
+        <lines>1-152</lines>
+      </file>
+      <file path="tests/support/factories/process.factory.ts" kind="factory" symbol="processFactory" reason="Test factory for creating Process records with default schemas">
+        <lines>1-218</lines>
+      </file>
+      <file path="tests/support/factories/process-version.factory.ts" kind="factory" symbol="processVersionFactory" reason="Test factory for creating ProcessVersion records">
+        <lines>all</lines>
+      </file>
+      <file path="tests/integration/api-key-router.test.ts" kind="test" symbol="apiKey Router tests" reason="Reference pattern for integration tests - describe/it structure, tenant isolation testing, error handling">
+        <lines>1-100</lines>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@trpc/server" version="^11.0.0" />
+        <package name="@trpc/client" version="^11.0.0" />
+        <package name="zod" version="^3.24.2" />
+        <package name="@prisma/client" version="^7.0.1" />
+        <package name="next-auth" version="5.0.0-beta.25" />
+        <package name="vitest" version="^4.0.14" dev="true" />
+        <package name="@playwright/test" version="^1.57.0" dev="true" />
+      </ecosystem>
+      <note>Consider adding ajv package for JSON Schema Draft 7 validation if not already present</note>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">All database queries MUST filter by tenantId from session - never trust client-provided tenant IDs</constraint>
+    <constraint type="architecture">Process router must use protectedProcedure for all endpoints (no public access)</constraint>
+    <constraint type="architecture">JSON columns (inputSchema, outputSchema, config) use Prisma Json type</constraint>
+    <constraint type="naming">Router file: process.ts (kebab-case), Router export: processRouter (camelCase)</constraint>
+    <constraint type="naming">IDs: proc_* prefix for Process, procv_* prefix for ProcessVersion</constraint>
+    <constraint type="pattern">Create and duplicate operations must use database transactions for atomicity</constraint>
+    <constraint type="pattern">Soft delete pattern: set deletedAt timestamp, filter deleted records in list/get queries</constraint>
+    <constraint type="pattern">Audit logs: fire-and-forget with void createAuditLog() pattern</constraint>
+    <constraint type="testing">Integration tests for routers, not unit tests (per testing-strategy-mvp.md)</constraint>
+    <constraint type="testing">50% minimum coverage for MVP</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="processRouter" kind="tRPC-router" path="src/server/api/routers/process.ts">
+      <procedure name="list" type="query" input="{status?: 'SANDBOX' | 'PRODUCTION', search?: string}" output="Process[]" />
+      <procedure name="get" type="query" input="{id: string}" output="Process & {versions: ProcessVersion[]}" />
+      <procedure name="create" type="mutation" input="CreateProcessInput" output="{process: Process, version: ProcessVersion}" />
+      <procedure name="update" type="mutation" input="{id: string, name?: string, description?: string, inputSchema?: Json, outputSchema?: Json}" output="Process" />
+      <procedure name="duplicate" type="mutation" input="{id: string, newName?: string}" output="{process: Process, version: ProcessVersion}" />
+      <procedure name="delete" type="mutation" input="{id: string}" output="{success: boolean}" />
+      <procedure name="restore" type="mutation" input="{id: string}" output="Process" />
+    </interface>
+    <interface name="CreateProcessInput" kind="zod-schema">
+      <field name="name" type="string" required="true" />
+      <field name="description" type="string" required="false" />
+      <field name="inputSchema" type="Json" required="true" description="Valid JSON Schema Draft 7" />
+      <field name="outputSchema" type="Json" required="true" description="Valid JSON Schema Draft 7" />
+      <field name="config" type="ProcessConfig" required="false" description="Optional initial config with defaults" />
+    </interface>
+    <interface name="ProcessConfig" kind="typescript-interface" path="src/server/services/process/types.ts">
+      <field name="systemPrompt" type="string" />
+      <field name="additionalInstructions" type="string" optional="true" />
+      <field name="maxTokens" type="number" default="1024" />
+      <field name="temperature" type="number" default="0.3" />
+      <field name="goal" type="string" />
+      <field name="cacheTtlSeconds" type="number" default="900" />
+      <field name="cacheEnabled" type="boolean" default="true" />
+      <field name="requestsPerMinute" type="number" default="60" />
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Integration tests for tRPC routers using Vitest. Tests run against real PostgreSQL test database with automatic cleanup between tests. Use createAuthenticatedCaller for protected procedures, createUnauthenticatedCaller for auth error testing. Follow Arrange-Act-Assert pattern. Test tenant isolation explicitly. Coverage threshold: 90% lines, 70% functions, 90% branches (router tests excluded from unit coverage as they're covered by integration tests).
+    </standards>
+    <locations>
+      <location>tests/integration/process-router.test.ts (NEW - to be created)</location>
+      <location>tests/unit/ (for service utilities if extracted)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test that processRouter is registered in appRouter and callable</idea>
+      <idea ac="2">Test list returns empty array for tenant with no processes</idea>
+      <idea ac="2">Test list returns only processes for authenticated tenant (isolation)</idea>
+      <idea ac="2">Test list filtering by SANDBOX/PRODUCTION status</idea>
+      <idea ac="2">Test list search by name substring (case-insensitive)</idea>
+      <idea ac="3">Test get returns process with all versions</idea>
+      <idea ac="3">Test get throws NOT_FOUND for other tenant's process</idea>
+      <idea ac="3">Test get throws NOT_FOUND for deleted process</idea>
+      <idea ac="4">Test create generates proc_* and procv_* IDs</idea>
+      <idea ac="4">Test create initializes version as "1.0.0" with SANDBOX environment</idea>
+      <idea ac="4">Test create transaction rollback on version creation failure</idea>
+      <idea ac="5">Test update modifies only provided fields</idea>
+      <idea ac="5">Test update validates JSON schema format</idea>
+      <idea ac="6">Test duplicate creates new IDs (not copy of original)</idea>
+      <idea ac="6">Test duplicate appends "(Copy)" to name</idea>
+      <idea ac="6">Test duplicate copies inputSchema and outputSchema</idea>
+      <idea ac="7">Test delete sets deletedAt timestamp</idea>
+      <idea ac="7">Test deleted process excluded from list results</idea>
+      <idea ac="8">Test UNAUTHORIZED for unauthenticated requests</idea>
+      <idea ac="8">Test tenant isolation across all procedures</idea>
+      <idea ac="9">Test invalid input rejected with ZodError details</idea>
+      <idea ac="10">Test audit log created for create, update, duplicate, delete</idea>
+      <idea ac="11">Test invalid JSON schema rejected (not valid Draft 7)</idea>
+    </ideas>
+  </tests>
+</story-context>

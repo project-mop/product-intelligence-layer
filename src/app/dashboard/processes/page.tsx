@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Zap, MoreHorizontal, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Zap, MoreHorizontal, Search, Pencil } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -46,6 +47,7 @@ function ProcessCardSkeleton() {
 }
 
 export default function ProcessesPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
 
   const { data: processes, isLoading, error } = api.process.list.useQuery({
@@ -157,7 +159,12 @@ export default function ProcessesPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/dashboard/processes/${process.id}/edit`)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
                           <DropdownMenuItem>Duplicate</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">
                             Delete

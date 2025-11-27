@@ -199,6 +199,14 @@ const duplicateProcessInput = z.object({
   newName: z.string().min(1).max(255).optional(),
 });
 
+/**
+ * Input schema for creating a draft version from a published version.
+ * Story 2.4 AC: 4
+ */
+const createDraftVersionInput = z.object({
+  processId: z.string().min(1, "Process ID is required"),
+});
+
 export const processRouter = createTRPCRouter({
   /**
    * List all processes for the current tenant.
@@ -665,5 +673,93 @@ export const processRouter = createTRPCRouter({
       });
 
       return process;
+    }),
+
+  /**
+   * Create a new draft version from the latest version of a process.
+   * Used when editing a published process - creates a new SANDBOX version.
+   *
+   * Story 2.4 AC: 4 - Changes to PUBLISHED versions create a new DRAFT version.
+   */
+  createDraftVersion: protectedProcedure
+    .input(createDraftVersionInput)
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Load process with all versions
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+        include: {
+          versions: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Check if there's already a SANDBOX version (draft)
+      const existingDraft = process.versions.find(
+        (v) => v.environment === "SANDBOX"
+      );
+      if (existingDraft) {
+        // Return existing draft instead of creating a new one
+        return existingDraft;
+      }
+
+      // Get the latest published version to copy config from
+      const latestVersion = process.versions[0];
+      if (!latestVersion) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Process has no versions",
+        });
+      }
+
+      // Create new draft version
+      const newVersionId = generateProcessVersionId();
+      const newVersion = await db.processVersion.create({
+        data: {
+          id: newVersionId,
+          processId: input.processId,
+          version: `${latestVersion.version}-draft`,
+          config: latestVersion.config as Prisma.InputJsonValue,
+          environment: "SANDBOX",
+        },
+      });
+
+      // Log audit event (fire-and-forget)
+      const requestContext = extractRequestContext(ctx.headers);
+      void createAuditLog({
+        tenantId,
+        userId: ctx.session.user.id,
+        action: "processVersion.draftCreated",
+        resource: "processVersion",
+        resourceId: newVersionId,
+        metadata: {
+          processId: input.processId,
+          sourceVersionId: latestVersion.id,
+        },
+        ipAddress: requestContext.ipAddress,
+        userAgent: requestContext.userAgent,
+      });
+
+      return newVersion;
     }),
 });

@@ -1034,6 +1034,154 @@ describe("process Router", () => {
     });
   });
 
+  describe("createDraftVersion (Story 2.4)", () => {
+    it("should create a new SANDBOX draft version from existing version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: { goal: "Original goal" },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.createDraftVersion({
+        processId: process.id,
+      });
+
+      expect(result.environment).toBe("SANDBOX");
+      expect(result.processId).toBe(process.id);
+      expect(result.id).toMatch(/^procv_/);
+    });
+
+    it("should return existing draft if one already exists", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const existingDraft = await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.createDraftVersion({
+        processId: process.id,
+      });
+
+      expect(result.id).toBe(existingDraft.id);
+    });
+
+    it("should copy config from latest version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          goal: "Test goal",
+          maxTokens: 2048,
+          components: [{ name: "TestComponent", type: "Test" }],
+        },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.createDraftVersion({
+        processId: process.id,
+      });
+
+      const config = result.config as Record<string, unknown>;
+      expect(config.goal).toBe("Test goal");
+      expect(config.maxTokens).toBe(2048);
+      expect(config.components).toHaveLength(1);
+    });
+
+    it("should throw NOT_FOUND for non-existent process", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.createDraftVersion({ processId: "proc_nonexistent" })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should throw NOT_FOUND for other tenant's process", async () => {
+      const { user: user1, tenant: tenant1 } =
+        await userFactory.createWithTenant();
+      const { process: tenant2Process } = await processFactory.createWithTenant(
+        { name: "Other Process" }
+      );
+      await processVersionFactory.create({
+        processId: tenant2Process.id,
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.createDraftVersion({ processId: tenant2Process.id })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should create audit log entry", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.createDraftVersion({
+        processId: process.id,
+      });
+
+      // Wait for fire-and-forget
+      await new Promise((r) => setTimeout(r, 100));
+
+      const auditLog = await testDb.auditLog.findFirst({
+        where: {
+          tenantId: tenant.id,
+          action: "processVersion.draftCreated",
+          resourceId: result.id,
+        },
+      });
+
+      expect(auditLog).not.toBeNull();
+      expect(
+        (auditLog?.metadata as { processId?: string })?.processId
+      ).toBe(process.id);
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(
+        caller.process.createDraftVersion({ processId: "proc_test" })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
+
   describe("input validation", () => {
     it("should reject invalid input with ZodError details", async () => {
       const { user, tenant } = await userFactory.createWithTenant();

@@ -8,9 +8,10 @@
  *
  * @module tests/integration/intelligence-api.test
  * @see docs/stories/3-1-endpoint-url-generation.md
+ * @see docs/stories/3-2-llm-gateway-integration.md
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 import { tenantFactory } from "../support/factories";
@@ -20,7 +21,10 @@ import { apiKeyFactory } from "../support/factories/api-key.factory";
 
 // Import route handlers directly
 import { POST as generateHandler } from "~/app/api/v1/intelligence/[processId]/generate/route";
+import { setGatewayOverride } from "~/app/api/v1/intelligence/[processId]/generate/testing";
 import { GET as schemaHandler } from "~/app/api/v1/intelligence/[processId]/schema/route";
+import type { LLMGateway, GenerateParams, GenerateResult } from "~/server/services/llm/types";
+import { LLMError } from "~/server/services/llm/types";
 
 /**
  * Helper to create a NextRequest for testing.
@@ -403,8 +407,38 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
     });
   });
 
-  describe("Success Response (AC: 1, 2)", () => {
-    it("should return 501 placeholder for valid request with published version", async () => {
+  describe("LLM Generation (AC: 1-10)", () => {
+    /**
+     * Create a mock LLM gateway for testing.
+     */
+    function createMockGateway(
+      generateFn: (params: GenerateParams) => Promise<GenerateResult>
+    ): LLMGateway {
+      return {
+        generate: vi.fn(generateFn),
+      };
+    }
+
+    beforeEach(() => {
+      // Clear any previous gateway override
+      setGatewayOverride(null);
+    });
+
+    afterEach(() => {
+      // Clear gateway override after each test
+      setGatewayOverride(null);
+    });
+
+    it("should return 200 with generated data for valid request (AC: 1-5, 10)", async () => {
+      // Set up mock gateway
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"result": "generated content"}',
+        usage: { inputTokens: 50, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 150,
+      }));
+      setGatewayOverride(mockGateway);
+
       const tenant = await tenantFactory.create();
       const process = await processFactory.create({ tenantId: tenant.id });
       await processVersionFactory.create({
@@ -433,20 +467,32 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 
       const response = await generateHandler(request, createParams(process.id));
 
-      // Should return 501 Not Implemented (placeholder for Story 3.2)
-      expect(response.status).toBe(501);
+      expect(response.status).toBe(200);
 
       const body = await response.json();
-      expect(body.success).toBe(false);
-      expect(body.error.code).toBe("NOT_IMPLEMENTED");
-      expect(body.error.message).toContain("Story 3.2");
+      expect(body.success).toBe(true);
+      expect(body.data).toEqual({ result: "generated content" });
+
+      // Verify meta fields (AC: 10)
+      expect(body.meta.version).toBe("1.0.0");
+      expect(body.meta.request_id).toMatch(/^req_/);
+      expect(typeof body.meta.latency_ms).toBe("number");
+      expect(body.meta.latency_ms).toBeGreaterThanOrEqual(0);
+      expect(body.meta.cached).toBe(false);
 
       // Verify request ID header
-      const requestId = response.headers.get("X-Request-Id");
-      expect(requestId).toMatch(/^req_/);
+      expect(response.headers.get("X-Request-Id")).toMatch(/^req_/);
     });
 
     it("should work with SANDBOX environment key and SANDBOX version", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"sandbox": "result"}',
+        usage: { inputTokens: 10, outputTokens: 5 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
       const tenant = await tenantFactory.create();
       const process = await processFactory.create({ tenantId: tenant.id });
       await processVersionFactory.create({
@@ -456,7 +502,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 
       const { plainTextKey } = await apiKeyFactory.create({
         tenantId: tenant.id,
-        environment: "SANDBOX", // Test key
+        environment: "SANDBOX",
         scopes: ["process:*"],
       });
 
@@ -474,11 +520,20 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 
       const response = await generateHandler(request, createParams(process.id));
 
-      // Should reach 501 (placeholder) - meaning auth and process lookup succeeded
-      expect(response.status).toBe(501);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data).toEqual({ sandbox: "result" });
     });
 
     it("should work with specific process scope", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"scoped": true}',
+        usage: { inputTokens: 10, outputTokens: 5 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
       const tenant = await tenantFactory.create();
       const process = await processFactory.create({ tenantId: tenant.id });
       await processVersionFactory.create({
@@ -489,7 +544,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const { plainTextKey } = await apiKeyFactory.create({
         tenantId: tenant.id,
         environment: "PRODUCTION",
-        scopes: [`process:${process.id}`], // Specific process scope
+        scopes: [`process:${process.id}`],
       });
 
       const request = createRequest(
@@ -506,7 +561,273 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 
       const response = await generateHandler(request, createParams(process.id));
 
-      expect(response.status).toBe(501);
+      expect(response.status).toBe(200);
+    });
+
+    it("should return 503 on LLM timeout (AC: 8)", async () => {
+      const mockGateway = createMockGateway(async () => {
+        throw new LLMError("LLM_TIMEOUT", "Request timed out");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("LLM_TIMEOUT");
+    });
+
+    it("should return 503 on LLM API error (AC: 9)", async () => {
+      const mockGateway = createMockGateway(async () => {
+        throw new LLMError("LLM_ERROR", "API error");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("LLM_ERROR");
+    });
+
+    it("should return 500 on output parse failure after retry (AC: 6, 7)", async () => {
+      // Return invalid JSON both times to trigger parse failure
+      const mockGateway = createMockGateway(async () => ({
+        text: "This is not valid JSON at all {{",
+        usage: { inputTokens: 10, outputTokens: 5 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(500);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("OUTPUT_PARSE_FAILED");
+    });
+
+    it("should succeed on retry when first response is invalid JSON (AC: 6)", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            text: "Not valid JSON",
+            usage: { inputTokens: 10, outputTokens: 5 },
+            model: "claude-3-haiku",
+            durationMs: 100,
+          };
+        }
+        return {
+          text: '{"retried": true}',
+          usage: { inputTokens: 15, outputTokens: 8 },
+          model: "claude-3-haiku",
+          durationMs: 150,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.data).toEqual({ retried: true });
+      expect(callCount).toBe(2);
+    });
+
+    it("should return 400 for missing input field", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{}',
+        usage: { inputTokens: 10, outputTokens: 5 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: {}, // Missing input field
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("BAD_REQUEST");
+      expect(body.error.message).toContain("input");
+    });
+
+    it("should return 400 for invalid input type", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{}',
+        usage: { inputTokens: 10, outputTokens: 5 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: "string instead of object" },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("BAD_REQUEST");
     });
   });
 

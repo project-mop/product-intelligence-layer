@@ -6,7 +6,7 @@
  * Main endpoint for generating intelligence output from a process.
  * Requires Bearer token authentication via API key.
  *
- * @see docs/tech-spec-epic-3.md#Story-3.1-Endpoint-URL-Generation
+ * @see docs/tech-spec-epic-3.md#Story-3.2-LLM-Gateway-Integration
  * @see docs/architecture.md#Public-API-Patterns
  */
 
@@ -19,16 +19,44 @@ import {
   assertProcessAccess,
 } from "~/server/services/auth/api-key-validator";
 import {
+  createSuccessResponse,
   unauthorized,
   forbidden,
   notFound,
-  notImplemented,
+  badRequest,
+  llmTimeout,
+  llmError,
+  outputParseFailed,
 } from "~/server/services/api/response";
+import { AnthropicGateway } from "~/server/services/llm";
+import { LLMError } from "~/server/services/llm/types";
+import { ProcessEngine, ProcessEngineError } from "~/server/services/process/engine";
+import type { ProcessConfig } from "~/server/services/process/types";
+import { getGatewayOverride } from "./testing";
 
 interface RouteParams {
   params: Promise<{
     processId: string;
   }>;
+}
+
+/**
+ * LLM Gateway instance.
+ *
+ * Supports dependency injection for testing via getGatewayOverride from ./testing.ts.
+ * In production, uses AnthropicGateway (lazy initialized).
+ */
+let defaultGateway: AnthropicGateway | null = null;
+
+function getGateway(): AnthropicGateway {
+  const override = getGatewayOverride();
+  if (override) {
+    return override as AnthropicGateway;
+  }
+  if (!defaultGateway) {
+    defaultGateway = new AnthropicGateway();
+  }
+  return defaultGateway;
 }
 
 /**
@@ -42,13 +70,19 @@ interface RouteParams {
  *
  * Response:
  * - 200: Success with generated output
+ * - 400: Invalid/missing input
  * - 401: Invalid/missing API key
  * - 403: API key lacks process access
  * - 404: Process not found or no published version
- * - 501: LLM integration not implemented (placeholder)
+ * - 500: Output parse failed after retry
+ * - 503: LLM timeout or error
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(
+  request: NextRequest,
+  { params }: RouteParams
+) {
   const requestId = generateRequestId();
+  const startTime = Date.now();
 
   // Extract processId from route params
   const { processId } = await params;
@@ -107,27 +141,84 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Step 6: Return 501 Not Implemented placeholder for LLM integration (Story 3.2)
-  // This response indicates the endpoint is working but LLM logic is not yet implemented
-  return notImplemented(
-    "LLM integration not yet implemented. See Story 3.2.",
-    requestId
-  );
+  // Step 6: Parse and validate request body
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return badRequest("Invalid JSON in request body", requestId);
+  }
 
-  // Future implementation (Story 3.2) will:
-  // 1. Parse and validate input against process.inputSchema
-  // 2. Build prompt from activeVersion.config
-  // 3. Call LLM gateway
-  // 4. Validate output against process.outputSchema
-  // 5. Return generated intelligence
-  //
-  // return createSuccessResponse(
-  //   {
-  //     processId: process.id,
-  //     versionId: activeVersion.id,
-  //     output: generatedOutput,
-  //   },
-  //   requestId,
-  //   startTime
-  // );
+  if (!body || typeof body !== "object") {
+    return badRequest("Request body must be an object", requestId);
+  }
+
+  const { input } = body as { input?: unknown };
+
+  if (input === undefined) {
+    return badRequest("Missing required field: input", requestId);
+  }
+
+  if (typeof input !== "object" || input === null) {
+    return badRequest("Field 'input' must be an object", requestId);
+  }
+
+  // Step 7: Get process config from version
+  const config = activeVersion.config as unknown as ProcessConfig;
+
+  // Step 8: Initialize ProcessEngine with LLM gateway
+  const gateway = getGateway();
+  const engine = new ProcessEngine(gateway);
+
+  // Step 9: Generate intelligence
+  try {
+    const result = await engine.generateIntelligence(
+      config,
+      input as Record<string, unknown>
+    );
+
+    // Step 10: Return success response
+    return createSuccessResponse(
+      result.data,
+      requestId,
+      startTime,
+      false // cached = false (Epic 5 implements caching)
+    );
+  } catch (error) {
+    // Handle LLM errors
+    if (error instanceof LLMError) {
+      console.error(`[Generate API] LLM error: ${error.code} - ${error.message}`);
+
+      if (error.code === "LLM_TIMEOUT") {
+        return llmTimeout(
+          "LLM request timed out. Please try again.",
+          requestId
+        );
+      }
+
+      // LLM_ERROR and LLM_RATE_LIMITED
+      return llmError(
+        "LLM service error. Please try again later.",
+        requestId
+      );
+    }
+
+    // Handle process engine errors
+    if (error instanceof ProcessEngineError) {
+      console.error(
+        `[Generate API] Process engine error: ${error.code} - ${error.message}`
+      );
+
+      if (error.code === "OUTPUT_PARSE_FAILED") {
+        return outputParseFailed(
+          "Failed to parse LLM response. Please try again.",
+          requestId
+        );
+      }
+    }
+
+    // Unknown errors
+    console.error("[Generate API] Unknown error:", error);
+    return llmError("An unexpected error occurred", requestId);
+  }
 }

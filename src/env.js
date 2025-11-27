@@ -27,8 +27,12 @@ export const env = createEnv({
     N8N_WEBHOOK_BASE_URL: z.string().url().optional(),
     N8N_WEBHOOK_SECRET: z.string().optional(),
 
+    // LLM Gateway (Epic 3)
+    ANTHROPIC_API_KEY: z.string().optional(),
+    ANTHROPIC_MODEL: z.string().optional(),
+    LLM_TIMEOUT_MS: z.coerce.number().optional(),
+
     // Future: External Services (uncomment when needed)
-    // ANTHROPIC_API_KEY: z.string().optional(),
     // STRIPE_SECRET_KEY: z.string().optional(),
     // STRIPE_WEBHOOK_SECRET: z.string().optional(),
   },
@@ -55,7 +59,10 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     N8N_WEBHOOK_BASE_URL: process.env.N8N_WEBHOOK_BASE_URL,
     N8N_WEBHOOK_SECRET: process.env.N8N_WEBHOOK_SECRET,
-    // Future: Add runtime env vars here when uncommented above
+    // LLM Gateway
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+    LLM_TIMEOUT_MS: process.env.LLM_TIMEOUT_MS,
   },
 
   /**

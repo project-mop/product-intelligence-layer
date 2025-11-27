@@ -55,7 +55,11 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "BAD_REQUEST"
   | "NOT_IMPLEMENTED"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "LLM_TIMEOUT"
+  | "LLM_ERROR"
+  | "OUTPUT_PARSE_FAILED"
+  | "INVALID_INPUT";
 
 /**
  * HTTP status codes for each error code.
@@ -67,6 +71,10 @@ const ERROR_STATUS_CODES: Record<ApiErrorCode, number> = {
   BAD_REQUEST: 400,
   NOT_IMPLEMENTED: 501,
   INTERNAL_ERROR: 500,
+  LLM_TIMEOUT: 503,
+  LLM_ERROR: 503,
+  OUTPUT_PARSE_FAILED: 500,
+  INVALID_INPUT: 400,
 };
 
 /**
@@ -213,4 +221,45 @@ export function internalError(
   requestId?: string
 ): Response {
   return createErrorResponse("INTERNAL_ERROR", message, requestId);
+}
+
+/**
+ * Creates a 503 LLM Timeout response.
+ */
+export function llmTimeout(
+  message: string,
+  requestId?: string
+): Response {
+  return createErrorResponse("LLM_TIMEOUT", message, requestId);
+}
+
+/**
+ * Creates a 503 LLM Error response.
+ */
+export function llmError(
+  message: string,
+  requestId?: string
+): Response {
+  return createErrorResponse("LLM_ERROR", message, requestId);
+}
+
+/**
+ * Creates a 500 Output Parse Failed response.
+ */
+export function outputParseFailed(
+  message: string,
+  requestId?: string
+): Response {
+  return createErrorResponse("OUTPUT_PARSE_FAILED", message, requestId);
+}
+
+/**
+ * Creates a 400 Invalid Input response.
+ */
+export function invalidInput(
+  message: string,
+  requestId?: string,
+  details?: Record<string, unknown>
+): Response {
+  return createErrorResponse("INVALID_INPUT", message, requestId, details);
 }

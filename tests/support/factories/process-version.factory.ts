@@ -19,6 +19,8 @@ let counter = 0;
 const defaultConfig = {
   goal: "Test goal for process",
   systemPrompt: "You are a test assistant.",
+  inputSchemaDescription: "Test input schema description",
+  outputSchemaDescription: "{ result: string }",
   maxTokens: 512,
   temperature: 0.7,
   cacheTtlSeconds: 300,

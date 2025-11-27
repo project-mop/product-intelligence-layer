@@ -55,7 +55,7 @@ development_status:
   2-4-edit-intelligence-definition: done
   2-5-duplicate-intelligence-definition: done
   2-6-delete-intelligence-definition: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: completed
 
   # Epic 3: API Generation & Endpoints (6 stories - Story 3.7 moved to Epic 6)
   epic-3: backlog

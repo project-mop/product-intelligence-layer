@@ -1,0 +1,256 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>5</storyId>
+    <title>Duplicate Intelligence Definition</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-5-duplicate-intelligence-definition.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to duplicate an existing intelligence definition</iWant>
+    <soThat>I can create variations without starting from scratch</soThat>
+    <tasks>
+      <task id="1" ac="1">Add Duplicate Action to Intelligence Card - Add "Duplicate" item to dropdown menu in src/app/dashboard/processes/page.tsx</task>
+      <task id="2" ac="2">Create Duplicate Dialog Component - src/components/process/DuplicateDialog.tsx with name input and validation</task>
+      <task id="3" ac="3,4,5,6">Implement process.duplicate tRPC Mutation - NOTE: Already implemented at src/server/api/routers/process.ts:488-570</task>
+      <task id="4" ac="3">Create Audit Log Entry - Already implemented with action="process.duplicated"</task>
+      <task id="5" ac="7">Implement Redirect to Edit Page - Navigate to /dashboard/processes/[newId]/edit on success</task>
+      <task id="6" ac="1-7">Write Tests - Integration tests for duplicate mutation, unit tests for DuplicateDialog</task>
+      <task id="7" ac="1-7">Verification - typecheck, lint, test:unit, test:integration, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Duplicate Action Available: "Duplicate" action is available on each intelligence card dropdown menu</criterion>
+    <criterion id="2">Duplicate Dialog: Duplicate opens a dialog for entering a new name (default: "{name} (Copy)")</criterion>
+    <criterion id="3">New Process Created: Duplicate creates a new Process record with a new unique ID (proc_* prefix)</criterion>
+    <criterion id="4">Full Deep Copy: Duplicate copies all fields including name, description, categories, inputSchema, outputSchema, and config</criterion>
+    <criterion id="5">Draft Status: Duplicate version is set to DRAFT (SANDBOX) status regardless of source status</criterion>
+    <criterion id="6">No Version History: Duplicate has no version history (fresh start with single initial version)</criterion>
+    <criterion id="7">Redirect to Edit: User is redirected to the edit page for the duplicated intelligence</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Story 2.5: Duplicate Intelligence Definition</section>
+        <snippet>Covers FR-109 (duplicate). Duplicate opens dialog for new name, creates new Process with new ID, deep copies all fields, sets status to DRAFT, clears version history, redirects to edit page.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Product Intelligence Layer Epic Breakdown</title>
+        <section>Story 2.5: Duplicate Intelligence Definition</section>
+        <snippet>As a user, I want to duplicate an existing intelligence definition so that I can create variations without starting from scratch. Deep copy all nested structures, generate new unique ID.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy MVP</title>
+        <section>Test Types Overview</section>
+        <snippet>Unit tests with Vitest in tests/unit/, integration tests in tests/integration/, component tests with RTL. Coverage thresholds: 90% lines, 70% functions. Routers tested via integration tests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-4-edit-intelligence-definition.md</path>
+        <title>Story 2.4: Edit Intelligence Definition</title>
+        <section>File List</section>
+        <snippet>Provides patterns for dropdown menu actions, tRPC mutations, audit logging, and test patterns. Edit action at page.tsx:162-167, createDraftVersion mutation shows deep copy pattern.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>tRPC router</kind>
+        <symbol>processRouter.duplicate</symbol>
+        <lines>488-570</lines>
+        <reason>ALREADY IMPLEMENTED: The duplicate mutation exists and handles deep copy of process and version, generates new IDs, sets SANDBOX environment, creates audit log. Story needs UI integration only.</reason>
+      </file>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>tRPC router</kind>
+        <symbol>duplicateProcessInput</symbol>
+        <lines>197-200</lines>
+        <reason>Input schema for duplicate mutation: { id: string, newName?: string }</reason>
+      </file>
+      <file>
+        <path>src/app/dashboard/processes/page.tsx</path>
+        <kind>page component</kind>
+        <symbol>ProcessesPage</symbol>
+        <lines>160-172</lines>
+        <reason>Dropdown menu with existing actions (View Details, Edit, Duplicate placeholder, Delete). Line 168 has placeholder Duplicate item that needs wiring to dialog.</reason>
+      </file>
+      <file>
+        <path>src/app/dashboard/processes/[id]/edit/page.tsx</path>
+        <kind>page component</kind>
+        <symbol>EditProcessPage</symbol>
+        <lines>1-393</lines>
+        <reason>Target redirect page after successful duplication. Already implemented.</reason>
+      </file>
+      <file>
+        <path>src/components/ui/dialog.tsx</path>
+        <kind>UI component</kind>
+        <symbol>Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter</symbol>
+        <lines>all</lines>
+        <reason>shadcn Dialog component for DuplicateDialog implementation</reason>
+      </file>
+      <file>
+        <path>src/components/ui/input.tsx</path>
+        <kind>UI component</kind>
+        <symbol>Input</symbol>
+        <lines>all</lines>
+        <reason>Input component for name field in dialog</reason>
+      </file>
+      <file>
+        <path>src/components/ui/button.tsx</path>
+        <kind>UI component</kind>
+        <symbol>Button</symbol>
+        <lines>all</lines>
+        <reason>Button component for dialog actions</reason>
+      </file>
+      <file>
+        <path>src/lib/id.ts</path>
+        <kind>utility</kind>
+        <symbol>generateProcessId, generateProcessVersionId</symbol>
+        <lines>all</lines>
+        <reason>ID generation functions already used in duplicate mutation</reason>
+      </file>
+      <file>
+        <path>tests/integration/process-router.test.ts</path>
+        <kind>test file</kind>
+        <symbol>describe("process Router")</symbol>
+        <lines>all</lines>
+        <reason>Existing integration tests for process router. Add duplicate mutation tests here following established patterns.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/process.factory.ts</path>
+        <kind>test factory</kind>
+        <symbol>processFactory</symbol>
+        <lines>all</lines>
+        <reason>Factory for creating test processes. Use in duplicate integration tests.</reason>
+      </file>
+      <file>
+        <path>tests/support/trpc.ts</path>
+        <kind>test utility</kind>
+        <symbol>createAuthenticatedCaller, createUnauthenticatedCaller</symbol>
+        <lines>all</lines>
+        <reason>Test callers for tRPC router testing</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>@trpc/client</package>
+        <version>^11.0.0</version>
+      </node>
+      <node>
+        <package>@trpc/react-query</package>
+        <version>^11.0.0</version>
+      </node>
+      <node>
+        <package>react-hook-form</package>
+        <version>^7.66.1</version>
+      </node>
+      <node>
+        <package>@hookform/resolvers</package>
+        <version>^5.2.2</version>
+      </node>
+      <node>
+        <package>zod</package>
+        <version>^3.24.2</version>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.555.0</version>
+      </node>
+      <node>
+        <package>@radix-ui/react-dialog</package>
+        <version>^1.1.15</version>
+      </node>
+      <node>
+        <package>sonner</package>
+        <version>^2.0.7</version>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^4.0.14</version>
+      </node>
+      <node>
+        <package>@testing-library/react</package>
+        <version>^16.3.0</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">ADR-003: Use tRPC for all internal dashboard operations (type-safe end-to-end)</constraint>
+    <constraint type="architecture">Duplicate always creates SANDBOX environment version (safe iteration)</constraint>
+    <constraint type="architecture">No version history on duplicate - fresh start with single version</constraint>
+    <constraint type="security">Tenant isolation: Users can only duplicate processes belonging to their tenant</constraint>
+    <constraint type="audit">All duplicate operations must create audit log entries with action="process.duplicated"</constraint>
+    <constraint type="naming">Process IDs use proc_* prefix, version IDs use procv_* prefix</constraint>
+    <constraint type="validation">Name is required, max 255 characters per schema</constraint>
+    <constraint type="testing">50% coverage minimum for MVP, routers tested via integration tests</constraint>
+    <constraint type="ui">Use shadcn/ui components consistently (Dialog, Button, Input)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>process.duplicate</name>
+      <kind>tRPC mutation</kind>
+      <signature>mutation({ id: string, newName?: string }) => Promise&lt;{ process: Process, version: ProcessVersion }&gt;</signature>
+      <path>src/server/api/routers/process.ts:488-570</path>
+    </interface>
+    <interface>
+      <name>api.process.duplicate.useMutation</name>
+      <kind>React Query hook</kind>
+      <signature>useMutation() => { mutate, mutateAsync, isPending, isSuccess, data, error }</signature>
+      <path>Generated by tRPC</path>
+    </interface>
+    <interface>
+      <name>DuplicateDialog props</name>
+      <kind>React component interface</kind>
+      <signature>{ open: boolean, onOpenChange: (open: boolean) => void, process: { id: string, name: string }, onSuccess?: (newProcessId: string) => void }</signature>
+      <path>To be created at src/components/process/DuplicateDialog.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Integration tests for tRPC routers using Vitest with real PostgreSQL database. Use createAuthenticatedCaller/createUnauthenticatedCaller from tests/support/trpc.ts. Use factories (processFactory, userFactory, tenantFactory) for test data. Tests run sequentially with database reset between tests. Unit tests for React components using Vitest + Testing Library with renderWithProviders helper. Coverage thresholds: 90% lines, 70% functions.
+    </standards>
+    <locations>
+      <location>tests/integration/process-router.test.ts</location>
+      <location>tests/unit/components/process/DuplicateDialog.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="3,4,5,6">Integration: Test successful duplication with default name suffix "(Copy)"</idea>
+      <idea ac="3,4,5,6">Integration: Test successful duplication with custom name</idea>
+      <idea ac="4">Integration: Test deep copy of all process fields (name, description, inputSchema, outputSchema)</idea>
+      <idea ac="4">Integration: Test deep copy of version config (goal, components, settings)</idea>
+      <idea ac="5">Integration: Test version is SANDBOX regardless of source being PRODUCTION</idea>
+      <idea ac="6">Integration: Test duplicate has only one version (no history)</idea>
+      <idea ac="3">Integration: Test tenant isolation - cannot duplicate other tenant's process</idea>
+      <idea ac="3">Integration: Test 404 for non-existent process</idea>
+      <idea ac="3">Integration: Test audit log entry created with sourceProcessId metadata</idea>
+      <idea ac="3">Integration: Test unauthenticated request rejected</idea>
+      <idea ac="2">Unit: Test DuplicateDialog renders with default name</idea>
+      <idea ac="2">Unit: Test DuplicateDialog name input validation (required, max length)</idea>
+      <idea ac="2">Unit: Test DuplicateDialog loading state during mutation</idea>
+      <idea ac="2">Unit: Test DuplicateDialog calls onSuccess with new process ID</idea>
+    </ideas>
+  </tests>
+
+  <implementationNotes>
+    <note priority="high">The process.duplicate tRPC mutation is ALREADY IMPLEMENTED at src/server/api/routers/process.ts:488-570. This story primarily needs UI integration work.</note>
+    <note priority="high">The dropdown menu at page.tsx:168 has a placeholder "Duplicate" item that needs to be wired to open the DuplicateDialog.</note>
+    <note priority="medium">Follow the Edit action pattern at page.tsx:162-167 for adding onClick handler and icon</note>
+    <note priority="medium">Use Copy icon from lucide-react for the Duplicate action</note>
+    <note priority="medium">After successful duplication, redirect to /dashboard/processes/[newId]/edit</note>
+    <note priority="medium">Show success toast using sonner: "Intelligence duplicated successfully"</note>
+  </implementationNotes>
+</story-context>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Zap, MoreHorizontal, Search, Pencil } from "lucide-react";
+import { Plus, Zap, MoreHorizontal, Search, Pencil, Copy } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { useState } from "react";
+import { DuplicateDialog } from "~/components/process/DuplicateDialog";
 
 function formatDate(date: Date | null): string {
   if (!date) return "Never";
@@ -49,6 +50,10 @@ function ProcessCardSkeleton() {
 export default function ProcessesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [duplicateProcess, setDuplicateProcess] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { data: processes, isLoading, error } = api.process.list.useQuery({
     search: search || undefined,
@@ -165,7 +170,12 @@ export default function ProcessesPage() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem>Duplicate</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDuplicateProcess({ id: process.id, name: process.name })}
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Duplicate
+                          </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">
                             Delete
                           </DropdownMenuItem>
@@ -195,6 +205,17 @@ export default function ProcessesPage() {
           </div>
         )}
       </div>
+
+      {/* Duplicate Dialog */}
+      {duplicateProcess && (
+        <DuplicateDialog
+          open={!!duplicateProcess}
+          onOpenChange={(open) => {
+            if (!open) setDuplicateProcess(null);
+          }}
+          process={duplicateProcess}
+        />
+      )}
     </div>
   );
 }

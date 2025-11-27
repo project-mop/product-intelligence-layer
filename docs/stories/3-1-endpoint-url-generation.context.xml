@@ -1,0 +1,154 @@
+<story-context id="3-1-endpoint-url-generation" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>1</storyId>
+    <title>Endpoint URL Generation</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-1-endpoint-url-generation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>a unique API endpoint URL generated when I save my intelligence definition</iWant>
+    <soThat>I can immediately start calling my intelligence API</soThat>
+    <tasks>
+      <task id="1" ac="1,2">Create API Route Structure - POST /api/v1/intelligence/[processId]/generate and GET /schema</task>
+      <task id="2" ac="5,6">Implement Bearer Token Authentication Middleware - reuse existing api-key-validator.ts</task>
+      <task id="3" ac="5,6">Implement Process Lookup with Tenant Isolation - check for published version</task>
+      <task id="4" ac="3,4">Create EndpointUrl.tsx component with copy button and status indicator</task>
+      <task id="5" ac="3,4">Update Process Detail Page to display endpoint URL</task>
+      <task id="6" ac="1">Add Request ID Generation - generateRequestId() already exists in lib/id.ts</task>
+      <task id="7" ac="5,6">Implement Standard Response Format helpers (success/error responses)</task>
+      <task id="8" ac="1-6">Write Integration Tests for auth, 404s, tenant isolation</task>
+      <task id="9" ac="1-6">Verification - typecheck, lint, test, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">URL Generation on Save: Saving a complete intelligence definition generates a unique endpoint URL based on the process ID</criterion>
+    <criterion id="2">URL Format: Endpoint URL format follows pattern /api/v1/intelligence/:processId/generate where processId is the proc_* ID</criterion>
+    <criterion id="3">Prominent Display: The endpoint URL is displayed prominently on the process detail page after saving</criterion>
+    <criterion id="4">One-Click Copy: A copy button copies the full URL (with base domain) to clipboard with toast confirmation</criterion>
+    <criterion id="5">Callable When Published: Endpoint is immediately callable once process has a published version (SANDBOX or PRODUCTION status)</criterion>
+    <criterion id="6">Draft State Handling: Draft-only processes show the endpoint URL but return 404 if called until a version is published</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Story 3.1 Endpoint URL Generation">
+        Defines REST API structure, authentication flow, response format, and acceptance criteria for endpoint URL generation.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Public API Patterns">
+        Specifies REST for public intelligence endpoints (not tRPC), Bearer token auth, and response format with meta.request_id, meta.latency_ms.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Integration Tests">
+        Integration tests for API routes using Vitest. tRPC routers tested via createAuthenticatedCaller. 90% coverage threshold.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Specification" section="API Test Console">
+        Defines visual styling for code blocks (monospace), copy buttons, and toast notifications for clipboard actions.
+      </doc>
+      <doc path="docs/stories/2-6-delete-intelligence-definition.md" title="Story 2.6" section="File List">
+        Previous story patterns: DeleteDialog, dropdown menu integration, toast notifications with sonner.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="src/server/services/auth/api-key-validator.ts" kind="service" symbol="validateApiKey, assertProcessAccess, createUnauthorizedResponse" reason="REUSE - Complete API key validation middleware already exists. Validates Bearer token, checks revocation/expiration, returns ApiKeyContext with tenantId, keyId, scopes, environment."/>
+      <file path="src/server/services/auth/api-key.ts" kind="service" symbol="hashKey, generateKey" reason="REUSE - Key hashing and generation utilities for API key validation"/>
+      <file path="src/server/services/process/types.ts" kind="types" symbol="ProcessConfig, ComponentDefinition" reason="REFERENCE - Type definitions for process configuration used in prompt assembly"/>
+      <file path="src/lib/id.ts" kind="utility" symbol="generateRequestId, ID_PREFIXES" reason="REUSE - Request ID generation already exists with req_ prefix"/>
+      <file path="src/server/api/routers/process.ts" kind="router" symbol="processRouter" lines="1-150" reason="REFERENCE - Process CRUD patterns, tenant isolation via ctx.tenantId, JSON schema validation"/>
+      <file path="src/server/db.ts" kind="database" symbol="db" reason="REUSE - Prisma database client for process/version queries"/>
+      <file path="src/components/process/DeleteDialog.tsx" kind="component" symbol="DeleteDialog" reason="REFERENCE - Dialog pattern with React Hook Form, Zod validation, sonner toast"/>
+      <file path="src/components/ui/button.tsx" kind="component" symbol="Button" reason="REUSE - Button component for copy action"/>
+      <file path="src/components/ui/badge.tsx" kind="component" symbol="Badge" reason="REUSE - Badge for status indicator (Draft/Published)"/>
+      <file path="src/components/ui/sonner.tsx" kind="component" symbol="Toaster" reason="REUSE - Toast notifications via sonner"/>
+      <file path="tests/integration/process-router.test.ts" kind="test" symbol="process router tests" reason="REFERENCE - Integration test patterns: factory usage, tenant isolation tests, error handling"/>
+      <file path="tests/support/trpc.ts" kind="test-support" symbol="createAuthenticatedCaller, createUnauthenticatedCaller" reason="REUSE - tRPC test callers for router testing"/>
+      <file path="tests/support/factories/process.factory.ts" kind="test-support" symbol="processFactory" reason="REUSE - Process factory for creating test data"/>
+      <file path="tests/support/factories/process-version.factory.ts" kind="test-support" symbol="processVersionFactory, createProduction" reason="REUSE - ProcessVersion factory with createProduction helper for published versions"/>
+      <file path="tests/support/factories/api-key.factory.ts" kind="test-support" symbol="apiKeyFactory" reason="REUSE - API key factory for auth testing"/>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="next" version="^15.2.3">Next.js App Router for API routes</package>
+        <package name="@trpc/server" version="^11.0.0">tRPC for typed procedures (dashboard only)</package>
+        <package name="zod" version="^3.24.2">Schema validation for API inputs</package>
+        <package name="sonner" version="^2.0.7">Toast notifications</package>
+        <package name="lucide-react" version="^0.555.0">Icons including Copy icon</package>
+        <package name="vitest" version="^4.0.14">Testing framework</package>
+        <package name="@prisma/client" version="^7.0.1">Database ORM</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface name="validateApiKey" kind="function" path="src/server/services/auth/api-key-validator.ts">
+      <signature>async function validateApiKey(authHeader: string | null): Promise&lt;ApiKeyValidationResult&gt;</signature>
+      <notes>Returns { valid: true, context: ApiKeyContext } or { valid: false, error: ApiKeyValidationError }</notes>
+    </interface>
+    <interface name="assertProcessAccess" kind="function" path="src/server/services/auth/api-key-validator.ts">
+      <signature>function assertProcessAccess(ctx: ApiKeyContext, processId: string): void</signature>
+      <notes>Throws Error if API key lacks process:* or process:{id} scope</notes>
+    </interface>
+    <interface name="generateRequestId" kind="function" path="src/lib/id.ts">
+      <signature>function generateRequestId(): string</signature>
+      <notes>Returns req_{random16chars} format ID</notes>
+    </interface>
+    <interface name="ApiKeyContext" kind="type" path="src/server/services/auth/api-key-validator.ts">
+      <signature>interface ApiKeyContext { tenantId: string; keyId: string; scopes: string[]; environment: Environment; }</signature>
+    </interface>
+    <interface name="POST /api/v1/intelligence/:processId/generate" kind="REST endpoint" path="src/app/api/v1/intelligence/[processId]/generate/route.ts">
+      <signature>POST with Bearer token auth, JSON body { input: Record&lt;string, unknown&gt; }, returns { success, data, meta } or { success: false, error }</signature>
+      <notes>Main intelligence generation endpoint - returns 501 placeholder until Story 3.2 LLM integration</notes>
+    </interface>
+    <interface name="GET /api/v1/intelligence/:processId/schema" kind="REST endpoint" path="src/app/api/v1/intelligence/[processId]/schema/route.ts">
+      <signature>GET with Bearer token auth, returns { success, data: { processId, name, version, inputSchema, outputSchema } }</signature>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint source="architecture.md">REST for public intelligence endpoints, not tRPC. tRPC is for internal dashboard operations only.</constraint>
+    <constraint source="architecture.md">Bearer token authentication required for all public API endpoints.</constraint>
+    <constraint source="architecture.md">Tenant isolation enforced via API key's tenantId - all queries must filter by tenant.</constraint>
+    <constraint source="tech-spec-epic-3.md">Response format must include meta.request_id, meta.latency_ms, meta.cached, meta.version.</constraint>
+    <constraint source="tech-spec-epic-3.md">Draft-only processes (no SANDBOX or PRODUCTION version) return 404 on API calls.</constraint>
+    <constraint source="tech-spec-epic-3.md">Error responses use format { success: false, error: { code, message } }.</constraint>
+    <constraint source="tech-spec-epic-3.md">HTTP status codes: 200 success, 401 invalid key, 403 no access, 404 not found, 501 not implemented (placeholder).</constraint>
+    <constraint source="testing-strategy-mvp.md">Integration tests required for API routes. Coverage threshold 90%.</constraint>
+    <constraint source="coding-standards">Use existing generateRequestId() from lib/id.ts - do not create new ID utilities.</constraint>
+    <constraint source="coding-standards">Use existing validateApiKey() from api-key-validator.ts - do not recreate auth logic.</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Integration tests using Vitest with real PostgreSQL database. Use factories from tests/support/factories/ for test data creation.
+      For API route testing, use native fetch or create test helpers similar to tRPC callers.
+      Database is automatically reset before each test via setup.integration.ts.
+      Coverage threshold: 90% lines, 70% functions, 90% branches, 90% statements.
+    </standards>
+    <locations>
+      <location>tests/integration/</location>
+      <location>tests/unit/</location>
+      <location>tests/support/</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test API route returns 200 with placeholder response for valid request with published version</idea>
+      <idea ac="5">Test 401 for missing Authorization header</idea>
+      <idea ac="5">Test 401 for invalid/malformed API key</idea>
+      <idea ac="5">Test 401 for expired API key</idea>
+      <idea ac="5">Test 401 for revoked API key</idea>
+      <idea ac="5">Test 403 for API key without process:* or process:{id} scope</idea>
+      <idea ac="6">Test 404 for non-existent processId</idea>
+      <idea ac="6">Test 404 for process with only DRAFT version (no published)</idea>
+      <idea ac="6">Test 404 for deleted process (deletedAt not null)</idea>
+      <idea ac="5">Test tenant isolation: cannot access other tenant's process with valid key</idea>
+      <idea ac="1">Test response includes meta.request_id in correct format (req_*)</idea>
+      <idea ac="1">Test response includes X-Request-Id header</idea>
+      <idea ac="2">Test schema endpoint returns correct inputSchema and outputSchema</idea>
+    </ideas>
+  </tests>
+</story-context>

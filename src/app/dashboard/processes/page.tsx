@@ -168,7 +168,11 @@ export default function ProcessesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/dashboard/processes/${process.id}`)}
+                          >
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => router.push(`/dashboard/processes/${process.id}/edit`)}
                           >

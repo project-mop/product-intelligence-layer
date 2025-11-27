@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Zap, MoreHorizontal, Search, Pencil, Copy } from "lucide-react";
+import { Plus, Zap, MoreHorizontal, Search, Pencil, Copy, Trash2 } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -18,6 +18,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useState } from "react";
 import { DuplicateDialog } from "~/components/process/DuplicateDialog";
+import { DeleteDialog } from "~/components/process/DeleteDialog";
 
 function formatDate(date: Date | null): string {
   if (!date) return "Never";
@@ -51,6 +52,10 @@ export default function ProcessesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [duplicateProcess, setDuplicateProcess] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [deleteProcess, setDeleteProcess] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -176,7 +181,11 @@ export default function ProcessesPage() {
                             <Copy className="mr-2 h-4 w-4" />
                             Duplicate
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteProcess({ id: process.id, name: process.name })}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -214,6 +223,17 @@ export default function ProcessesPage() {
             if (!open) setDuplicateProcess(null);
           }}
           process={duplicateProcess}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {deleteProcess && (
+        <DeleteDialog
+          open={!!deleteProcess}
+          onOpenChange={(open) => {
+            if (!open) setDeleteProcess(null);
+          }}
+          process={deleteProcess}
         />
       )}
     </div>

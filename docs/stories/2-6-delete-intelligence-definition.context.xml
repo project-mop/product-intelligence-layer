@@ -1,0 +1,205 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>6</storyId>
+    <title>Delete Intelligence Definition</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-6-delete-intelligence-definition.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to delete intelligence definitions I no longer need</iWant>
+    <soThat>I can keep my workspace clean and organized</soThat>
+    <tasks>
+      <task id="1" ac="1">Add Delete Action to Intelligence Card - Add "Delete" item to dropdown menu with Trash icon</task>
+      <task id="2" ac="2">Create Delete Confirmation Dialog Component - Require typing exact name to confirm deletion</task>
+      <task id="3" ac="3,4">Implement process.delete tRPC Mutation - Already implemented at src/server/api/routers/process.ts:577-623</task>
+      <task id="4" ac="3">Create Audit Log Entry - Already implemented (fire-and-forget pattern)</task>
+      <task id="5" ac="5,6">Implement Undo Toast with Restore - 10-second toast with undo action</task>
+      <task id="6" ac="6">Implement process.restore tRPC Mutation - Already implemented at src/server/api/routers/process.ts:630-676</task>
+      <task id="7" ac="7">Add API Warning in Delete Dialog - Placeholder warning for published API endpoints</task>
+      <task id="8" ac="1-7">Write Tests - Integration tests already exist; unit tests for DeleteDialog deferred</task>
+      <task id="9" ac="1-7">Verification - typecheck, lint, test:unit, test:integration, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Delete Action Available: "Delete" action is available on each intelligence card dropdown menu</ac>
+    <ac id="2">Confirmation Dialog: Delete requires typing the exact intelligence name to confirm (prevents accidental deletion)</ac>
+    <ac id="3">Soft Delete Implementation: Delete sets deletedAt timestamp (soft delete) rather than permanently removing the record</ac>
+    <ac id="4">List Exclusion: Deleted intelligences are hidden from the default list view (excluded by deletedAt: null filter)</ac>
+    <ac id="5">Undo Toast: After deletion, a toast notification appears with a 10-second undo option</ac>
+    <ac id="6">Undo Functionality: If undo is clicked within 10 seconds, deletedAt is cleared and the intelligence is restored to visibility</ac>
+    <ac id="7">Future API Warning: Intelligences with associated API endpoints show a warning before deletion (placeholder for Epic 3)</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic Technical Specification: Intelligence Definition</title>
+        <section>Delete Intelligence Flow</section>
+        <snippet>Delete flow: User clicks Delete -> Modal with name confirmation -> Server delete mutation -> Set deletedAt -> Audit log -> Toast with 10s undo option</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>tRPC Patterns, Database Patterns</section>
+        <snippet>ADR-003: tRPC for internal dashboard operations. Soft deletes use deletedAt (nullable timestamp). All database queries filtered by tenantId for tenant isolation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Integration Tests</section>
+        <snippet>Integration tests for routers via tRPC caller. 90% coverage threshold. Routers excluded from unit coverage (tested via integration). Fire-and-forget audit logs need setTimeout wait.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-5-duplicate-intelligence-definition.md</path>
+        <title>Story 2.5: Duplicate Intelligence Definition</title>
+        <section>Dev Agent Record</section>
+        <snippet>Follow DuplicateDialog pattern for DeleteDialog: React Hook Form + Zod + shadcn Dialog. Dropdown menu pattern at page.tsx:173-178. Toast pattern using sonner.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>process.delete, process.restore</symbol>
+        <lines>577-676</lines>
+        <reason>Delete mutation (577-623) and restore mutation (630-676) already implemented with tenant isolation and audit logging</reason>
+      </file>
+      <file>
+        <path>src/app/dashboard/processes/page.tsx</path>
+        <kind>page</kind>
+        <symbol>ProcessesPage</symbol>
+        <lines>1-221</lines>
+        <reason>Main processes page with dropdown menu (155-183). Delete DropdownMenuItem exists at line 179-181 but is non-functional. Add deleteProcess state and wire click handler.</reason>
+      </file>
+      <file>
+        <path>src/components/process/DuplicateDialog.tsx</path>
+        <kind>component</kind>
+        <symbol>DuplicateDialog</symbol>
+        <lines>1-136</lines>
+        <reason>Pattern to follow for DeleteDialog: React Hook Form, Zod validation, shadcn Dialog, tRPC mutation, toast, cache invalidation</reason>
+      </file>
+      <file>
+        <path>tests/integration/process-router.test.ts</path>
+        <kind>test</kind>
+        <symbol>describe("delete"), describe("restore")</symbol>
+        <lines>790-1005</lines>
+        <reason>Comprehensive integration tests already exist for delete (6 tests: 790-898) and restore (5 tests: 900-1005)</reason>
+      </file>
+      <file>
+        <path>src/components/ui/dialog.tsx</path>
+        <kind>component</kind>
+        <symbol>Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter</symbol>
+        <lines>all</lines>
+        <reason>shadcn Dialog base component for DeleteDialog</reason>
+      </file>
+      <file>
+        <path>src/components/ui/input.tsx</path>
+        <kind>component</kind>
+        <symbol>Input</symbol>
+        <lines>all</lines>
+        <reason>shadcn Input for name confirmation field</reason>
+      </file>
+      <file>
+        <path>src/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>all</lines>
+        <reason>shadcn Button - use variant="destructive" for Delete action</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react-hook-form@7.66.1</package>
+        <purpose>Form state management for DeleteDialog</purpose>
+      </node>
+      <node>
+        <package>@hookform/resolvers@5.2.2</package>
+        <purpose>Zod integration for react-hook-form</purpose>
+      </node>
+      <node>
+        <package>zod@3.24.2</package>
+        <purpose>Form validation schema</purpose>
+      </node>
+      <node>
+        <package>sonner@2.0.7</package>
+        <purpose>Toast notifications with action buttons (undo)</purpose>
+      </node>
+      <node>
+        <package>lucide-react@0.555.0</package>
+        <purpose>Trash2 icon for delete action</purpose>
+      </node>
+      <node>
+        <package>@radix-ui/react-dialog@1.1.15</package>
+        <purpose>Dialog primitive (via shadcn)</purpose>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Follow DuplicateDialog pattern for DeleteDialog component structure</constraint>
+    <constraint type="pattern">Use protectedProcedure for tenant-scoped tRPC operations</constraint>
+    <constraint type="pattern">Fire-and-forget audit logging via createAuditLog (non-blocking)</constraint>
+    <constraint type="pattern">Soft delete: set deletedAt timestamp, never hard delete in user actions</constraint>
+    <constraint type="security">Tenant isolation: all queries must include tenantId from session</constraint>
+    <constraint type="validation">Name confirmation must be exact match (case-sensitive)</constraint>
+    <constraint type="ux">Toast duration 10 seconds (10000ms) for undo action</constraint>
+    <constraint type="ux">Use destructive variant for Delete button styling</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>process.delete</name>
+      <kind>tRPC mutation</kind>
+      <signature>input: { id: string } -> { success: boolean }</signature>
+      <path>src/server/api/routers/process.ts:577-623</path>
+    </interface>
+    <interface>
+      <name>process.restore</name>
+      <kind>tRPC mutation</kind>
+      <signature>input: { id: string } -> Process</signature>
+      <path>src/server/api/routers/process.ts:630-676</path>
+    </interface>
+    <interface>
+      <name>DeleteDialogProps</name>
+      <kind>React component props</kind>
+      <signature>{ open: boolean; onOpenChange: (open: boolean) => void; process: { id: string; name: string }; onDeleted?: () => void }</signature>
+      <path>src/components/process/DeleteDialog.tsx (to be created)</path>
+    </interface>
+    <interface>
+      <name>toast with action</name>
+      <kind>sonner toast API</kind>
+      <signature>toast.success(message, { duration: 10000, action: { label: string, onClick: () => void } })</signature>
+      <path>sonner library</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Integration tests use Vitest with real PostgreSQL database. Tests use factory functions for data creation.
+      Fire-and-forget audit logs require setTimeout(100ms) wait before assertion.
+      Coverage threshold: 90% lines, 70% functions. Router tests are integration-only (excluded from unit coverage).
+      Test files: tests/integration/*.test.ts for routers, tests/unit/components/ for React components.
+    </standards>
+    <locations>
+      <location>tests/integration/process-router.test.ts</location>
+      <location>tests/unit/components/process/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">DeleteDialog component unit tests deferred per MVP 50% coverage guidance</idea>
+      <idea ac="2">Test name validation: exact match required, empty string rejected</idea>
+      <idea ac="3">Integration test already exists: should soft delete a process (set deletedAt)</idea>
+      <idea ac="4">Integration test already exists: should exclude deleted process from list</idea>
+      <idea ac="5">Test toast.success called with 10000ms duration and action object</idea>
+      <idea ac="6">Integration test already exists: should restore a soft-deleted process</idea>
+      <idea ac="7">Test warning display when process has SANDBOX/PRODUCTION versions</idea>
+      <idea ac="all">Integration tests for delete/restore mutations already comprehensive (11 tests total)</idea>
+    </ideas>
+  </tests>
+</story-context>

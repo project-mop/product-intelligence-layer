@@ -1,0 +1,175 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3</storyId>
+    <title>In-Browser Endpoint Testing</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-3-in-browser-endpoint-testing.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user with a generated endpoint</asA>
+    <iWant>to test my endpoint immediately in the browser with sample inputs</iWant>
+    <soThat>I can verify it works before integrating with my external systems</soThat>
+    <tasks>
+      <task id="1" ac="1">Create Test Page Route and Layout - page.tsx, loading state, breadcrumbs, protected route</task>
+      <task id="2" ac="3">Create Sample Payload Generator - src/lib/schema/sample-generator.ts with JSON Schema type handling</task>
+      <task id="3" ac="2,4,5,6,7">Create TestConsole Component - split panel, JSON editor/viewer, send button, latency, error styling</task>
+      <task id="4" ac="8">Create cURL Command Generator - src/lib/api/curl-generator.ts with copy functionality</task>
+      <task id="5" ac="4,9">Create tRPC Procedure - process.testGenerate using session auth, calls ProcessEngine</task>
+      <task id="6" ac="1">Add Test Button to Process Detail Page - link to /processes/:id/test</task>
+      <task id="7" ac="4,5,6,7">Implement Request/Response Flow - wire TestConsole to tRPC, handle states</task>
+      <task id="8" ac="2,3,8">Write Unit Tests - sample-generator.test.ts, curl-generator.test.ts</task>
+      <task id="9" ac="5,9">Write Integration Tests - process.testGenerate with mocked LLM</task>
+      <task id="10" ac="2,4,5,6,7">Write Component Tests - TestConsole.test.tsx</task>
+      <task id="11" ac="1-10">E2E Test - test-console.spec.ts full user flow</task>
+      <task id="12" ac="1-10">Verification - typecheck, lint, tests, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Test Page Access: Test page accessible from process detail page via "Test" button at /processes/:id/test</criterion>
+    <criterion id="AC2">Editable Input Panel: Left panel shows editable JSON input with syntax highlighting (Monaco editor or react-syntax-highlighter)</criterion>
+    <criterion id="AC3">Sample Payload Generation: Sample payload auto-generated from input schema - String→"example", Number→0, Boolean→true, required fields only</criterion>
+    <criterion id="AC4">Send Request Button: "Send Request" button initiates test call with loading state</criterion>
+    <criterion id="AC5">Response Panel: Right panel shows formatted JSON response with syntax highlighting</criterion>
+    <criterion id="AC6">Latency Display: Latency displayed prominently after response received (e.g., "1,245ms")</criterion>
+    <criterion id="AC7">Error Display: Error responses show error code and message clearly with appropriate styling</criterion>
+    <criterion id="AC8">Copy cURL Command: Button to copy full cURL command with headers to clipboard</criterion>
+    <criterion id="AC9">Session-Based Auth: Test calls use session auth (dashboard context) - no API key required for testing own processes</criterion>
+    <criterion id="AC10">No History Persistence: Test history not persisted (Epic 6 adds call logging)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Tech Spec" section="Story 3.3: In-Browser Endpoint Testing">
+        Defines test console flow: navigate to /processes/:id/test, generate sample payload from input schema, display editable JSON, send request via session auth, show response with latency.
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Tech Spec" section="Acceptance Criteria">
+        AC 3.3.1-10: Test page access, editable input panel, sample payload generation, send request button, response panel, latency display, error display, copy cURL, session auth, no history persistence.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Intelligence Generation Flow">
+        Core generation flow: Auth → Rate Limit → Input Validation → Cache → LLM → Output Validation → Response. Test console bypasses API key auth using session context.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Project Structure">
+        Test console location: src/app/(dashboard)/processes/[id]/test/page.tsx. Components in src/components/process/.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Spec" section="API Test Console">
+        Component anatomy: Request panel (left), Response panel (right), Action bar with Send button, copy cURL, latency display. States: Ready, Loading, Success, Error.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Spec" section="Journey 2: Test Endpoint">
+        Flow: View test console with pre-filled sample → Edit and send request → View formatted response with latency → Copy cURL/code snippets.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Types Overview">
+        Unit tests in tests/unit/, integration tests in tests/integration/, E2E tests in tests/e2e/. Coverage thresholds: 90% lines, 70% functions.
+      </doc>
+      <doc path="docs/stories/3-2-llm-gateway-integration.md" title="Story 3.2 (Done)" section="Dev Agent Record">
+        ProcessEngine available at src/server/services/process/engine.ts. AnthropicGateway at src/server/services/llm/anthropic.ts. Response helpers at src/server/services/api/response.ts.
+      </doc>
+    </docs>
+    <code>
+      <file path="src/server/services/process/engine.ts" kind="service" symbol="ProcessEngine" reason="Core generation orchestration - call generateIntelligence() for test execution">
+        ProcessEngine class with generateIntelligence(config, input) method. Handles prompt assembly, LLM call, JSON parsing with retry, and latency tracking.
+      </file>
+      <file path="src/server/services/process/types.ts" kind="types" symbol="ProcessConfig" reason="Type definition for process configuration passed to ProcessEngine">
+        ProcessConfig interface with systemPrompt, goal, maxTokens, temperature, inputSchemaDescription, outputSchemaDescription.
+      </file>
+      <file path="src/server/services/llm/anthropic.ts" kind="service" symbol="AnthropicGateway" reason="LLM gateway implementation for generation">
+        AnthropicGateway class implementing LLMGateway interface. Used by ProcessEngine for Claude API calls.
+      </file>
+      <file path="src/server/services/api/response.ts" kind="service" symbol="createSuccessResponse, createErrorResponse" reason="Response formatting utilities">
+        API response helpers with standard format. Error codes: LLM_TIMEOUT, LLM_ERROR, OUTPUT_PARSE_FAILED, INVALID_INPUT.
+      </file>
+      <file path="src/server/api/routers/process.ts" kind="router" symbol="processRouter" reason="Add testGenerate procedure to existing router">
+        Process tRPC router with list, get, create, update, duplicate, delete procedures. Add testGenerate mutation here.
+      </file>
+      <file path="src/app/dashboard/processes/[id]/page.tsx" kind="page" symbol="ProcessDetailPage" reason="Add Test button linking to /test route">
+        Process detail page with EndpointUrl component. Add Test button in actions area next to Edit button.
+      </file>
+      <file path="src/components/process/EndpointUrl.tsx" kind="component" symbol="EndpointUrl" reason="Pattern for copy functionality and URL display">
+        Component displaying API endpoint URL with copy button. Follow same patterns for cURL copy.
+      </file>
+      <file path="src/components/ui/*.tsx" kind="components" reason="shadcn/ui components for UI">
+        Button, Card, Badge, Textarea, Tabs, Skeleton, Tooltip - available for TestConsole UI.
+      </file>
+      <file path="tests/support/factories/process-version.factory.ts" kind="factory" reason="Test data generation">
+        ProcessVersion factory with createWithProcess(), createProduction() methods. Use for test setup.
+      </file>
+      <file path="tests/support/trpc.ts" kind="test-support" symbol="createAuthenticatedCaller" reason="tRPC test callers for integration tests">
+        Test helper for creating authenticated tRPC callers with session context.
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@anthropic-ai/sdk" version="^0.71.0">LLM gateway - used by ProcessEngine</package>
+        <package name="react-syntax-highlighter" version="TBD">Syntax highlighting for JSON panels - MAY NEED TO INSTALL</package>
+        <package name="lucide-react" version="^0.555.0">Icons - Play, Copy, Loader2, AlertCircle</package>
+        <package name="sonner" version="^2.0.7">Toast notifications for copy success</package>
+        <package name="zod" version="^3.24.2">Input validation for tRPC procedures</package>
+        <package name="@tanstack/react-query" version="^5.69.0">React Query for tRPC mutations</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture">Use tRPC protectedProcedure for session auth - no API key required</constraint>
+    <constraint source="architecture">Always filter queries by tenantId from session context</constraint>
+    <constraint source="story">No test history persistence - logging deferred to Epic 6</constraint>
+    <constraint source="tech-spec">Test console uses session auth, not API keys</constraint>
+    <constraint source="ux-design">Split panel layout - request left, response right</constraint>
+    <constraint source="ux-design">Loading state with spinner during request</constraint>
+    <constraint source="ux-design">Error state with red styling and clear error message</constraint>
+    <constraint source="testing">Unit tests for pure functions (sample-generator, curl-generator)</constraint>
+    <constraint source="testing">Integration tests for tRPC procedures with mocked LLM</constraint>
+    <constraint source="testing">E2E tests for full user flow</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="ProcessEngine.generateIntelligence" kind="method" path="src/server/services/process/engine.ts">
+      async generateIntelligence(config: ProcessConfig, input: Record&lt;string, unknown&gt;): Promise&lt;IntelligenceResult&gt;
+      Returns: { data: Record, meta: { latencyMs, retried, model, usage } }
+    </interface>
+    <interface name="process.testGenerate" kind="tRPC-mutation" path="src/server/api/routers/process.ts">
+      NEW - Input: { processId: string, input: Record&lt;string, unknown&gt; }
+      Output: { success: true, data: Record, meta: { latency_ms, request_id } } | error
+      Uses session auth (protectedProcedure), loads process by ID with tenant filter
+    </interface>
+    <interface name="generateSamplePayload" kind="function" path="src/lib/schema/sample-generator.ts">
+      NEW - generateSamplePayload(inputSchema: JsonSchema): Record&lt;string, unknown&gt;
+      Generates sample data: string→"example", number→0, boolean→true, arrays→[single item], required fields only
+    </interface>
+    <interface name="generateCurlCommand" kind="function" path="src/lib/api/curl-generator.ts">
+      NEW - generateCurlCommand(processId: string, input: Record, baseUrl: string): string
+      Returns formatted cURL command with Authorization header placeholder, Content-Type, line breaks
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit and integration tests. Playwright for E2E. Use AAA pattern (Arrange-Act-Assert).
+      Mock @anthropic-ai/sdk in unit tests. Use createAuthenticatedCaller for tRPC integration tests.
+      Coverage thresholds: 90% lines, 70% functions, 90% branches.
+    </standards>
+    <locations>
+      <location>tests/unit/sample-generator.test.ts - Sample payload generator unit tests</location>
+      <location>tests/unit/curl-generator.test.ts - cURL command generator unit tests</location>
+      <location>tests/unit/components/TestConsole.test.tsx - Component tests</location>
+      <location>tests/integration/test-console.test.ts - tRPC procedure integration tests</location>
+      <location>tests/e2e/test-console.spec.ts - Full user flow E2E tests</location>
+    </locations>
+    <ideas>
+      <idea ac="AC3">Test sample generator with all JSON Schema types: string, number, boolean, array, object, nested</idea>
+      <idea ac="AC3">Test sample generator handles required vs optional fields correctly</idea>
+      <idea ac="AC8">Test cURL generator output format with complex input objects</idea>
+      <idea ac="AC8">Test cURL generator includes correct headers</idea>
+      <idea ac="AC5,AC9">Integration test: process.testGenerate with valid input returns formatted response</idea>
+      <idea ac="AC9">Integration test: process.testGenerate requires authentication</idea>
+      <idea ac="AC9">Integration test: process.testGenerate enforces tenant isolation</idea>
+      <idea ac="AC7">Integration test: process.testGenerate returns proper error on LLM failure</idea>
+      <idea ac="AC6">Integration test: response includes latency_ms in meta</idea>
+      <idea ac="AC1-10">E2E: Navigate to process → click Test → verify sample payload → send request → verify response</idea>
+    </ideas>
+  </tests>
+</story-context>

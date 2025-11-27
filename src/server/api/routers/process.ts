@@ -14,10 +14,14 @@ import type { Prisma } from "../../../../generated/prisma";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
-import { generateProcessId, generateProcessVersionId } from "~/lib/id";
+import { generateProcessId, generateProcessVersionId, generateRequestId } from "~/lib/id";
 import { createAuditLog } from "~/server/services/audit";
 import { extractRequestContext } from "~/server/services/audit/context";
-import { DEFAULT_PROCESS_CONFIG } from "~/server/services/process/types";
+import { DEFAULT_PROCESS_CONFIG, type ProcessConfig } from "~/server/services/process/types";
+import { ProcessEngine, ProcessEngineError } from "~/server/services/process/engine";
+import { AnthropicGateway } from "~/server/services/llm/anthropic";
+import { LLMError } from "~/server/services/llm/types";
+import { getTestGatewayOverride } from "./process.testing";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -761,5 +765,182 @@ export const processRouter = createTRPCRouter({
       });
 
       return newVersion;
+    }),
+
+  /**
+   * Test generate intelligence using the process configuration.
+   *
+   * Uses session authentication (no API key required) for dashboard testing.
+   * Calls ProcessEngine.generateIntelligence() with the process config.
+   *
+   * Story 3.3 AC: 4, 9 - Session-based auth, test calls use dashboard context
+   *
+   * @see docs/stories/3-3-in-browser-endpoint-testing.md
+   */
+  testGenerate: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        input: z.record(z.unknown()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Load process with latest version
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+        include: {
+          versions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Get latest version config
+      const latestVersion = process.versions[0];
+      if (!latestVersion) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Process has no versions",
+        });
+      }
+
+      // Build ProcessConfig from stored config
+      const storedConfig = latestVersion.config as Record<string, unknown>;
+      const processConfig: ProcessConfig = {
+        systemPrompt: (storedConfig.systemPrompt as string) ?? "",
+        additionalInstructions: storedConfig.additionalInstructions as string | undefined,
+        maxTokens: (storedConfig.maxTokens as number) ?? DEFAULT_PROCESS_CONFIG.maxTokens,
+        temperature: (storedConfig.temperature as number) ?? DEFAULT_PROCESS_CONFIG.temperature,
+        inputSchemaDescription: (storedConfig.inputSchemaDescription as string) ?? "",
+        outputSchemaDescription: (storedConfig.outputSchemaDescription as string) ?? "",
+        goal: (storedConfig.goal as string) ?? "",
+        components: storedConfig.components as ProcessConfig["components"],
+        cacheTtlSeconds: (storedConfig.cacheTtlSeconds as number) ?? DEFAULT_PROCESS_CONFIG.cacheTtlSeconds,
+        cacheEnabled: (storedConfig.cacheEnabled as boolean) ?? DEFAULT_PROCESS_CONFIG.cacheEnabled,
+        requestsPerMinute: (storedConfig.requestsPerMinute as number) ?? DEFAULT_PROCESS_CONFIG.requestsPerMinute,
+      };
+
+      const requestId = generateRequestId();
+      const startTime = Date.now();
+
+      try {
+        // Initialize LLM gateway and ProcessEngine
+        // Use test override if set, otherwise create real gateway
+        const llmGateway = getTestGatewayOverride() ?? new AnthropicGateway();
+        const processEngine = new ProcessEngine(llmGateway);
+
+        // Call ProcessEngine.generateIntelligence()
+        const result = await processEngine.generateIntelligence(
+          processConfig,
+          input.input as Record<string, unknown>
+        );
+
+        const latencyMs = Date.now() - startTime;
+
+        // Log audit event (fire-and-forget)
+        const requestContext = extractRequestContext(ctx.headers);
+        void createAuditLog({
+          tenantId,
+          userId: ctx.session.user.id,
+          action: "process.testGenerate",
+          resource: "process",
+          resourceId: input.processId,
+          metadata: {
+            requestId,
+            latencyMs,
+            model: result.meta.model,
+            retried: result.meta.retried,
+          },
+          ipAddress: requestContext.ipAddress,
+          userAgent: requestContext.userAgent,
+        });
+
+        return {
+          success: true as const,
+          data: result.data,
+          meta: {
+            latency_ms: latencyMs,
+            request_id: requestId,
+            model: result.meta.model,
+            usage: result.meta.usage,
+          },
+        };
+      } catch (error) {
+        // Log error audit event
+        const requestContext = extractRequestContext(ctx.headers);
+        void createAuditLog({
+          tenantId,
+          userId: ctx.session.user.id,
+          action: "process.testGenerate.error",
+          resource: "process",
+          resourceId: input.processId,
+          metadata: {
+            requestId,
+            error: error instanceof Error ? error.message : "Unknown error",
+            errorCode: error instanceof LLMError ? error.code :
+                       error instanceof ProcessEngineError ? error.code : "UNKNOWN",
+          },
+          ipAddress: requestContext.ipAddress,
+          userAgent: requestContext.userAgent,
+        });
+
+        // Map errors to appropriate tRPC error codes
+        if (error instanceof LLMError) {
+          switch (error.code) {
+            case "LLM_TIMEOUT":
+              throw new TRPCError({
+                code: "TIMEOUT",
+                message: "Request timed out waiting for LLM response",
+                cause: error,
+              });
+            case "LLM_RATE_LIMITED":
+              throw new TRPCError({
+                code: "TOO_MANY_REQUESTS",
+                message: "LLM rate limit exceeded. Please try again later.",
+                cause: error,
+              });
+            default:
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: `LLM error: ${error.message}`,
+                cause: error,
+              });
+          }
+        }
+
+        if (error instanceof ProcessEngineError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Processing error: ${error.message}`,
+            cause: error,
+          });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Unknown error occurred",
+        });
+      }
     }),
 });

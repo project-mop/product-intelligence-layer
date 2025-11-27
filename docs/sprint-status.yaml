@@ -61,7 +61,7 @@ development_status:
   epic-3: contexted
   3-1-endpoint-url-generation: done
   3-2-llm-gateway-integration: done
-  3-3-in-browser-endpoint-testing: backlog
+  3-3-in-browser-endpoint-testing: done
   3-4-intelligence-list-dashboard: backlog
   3-5-view-json-schema: backlog
   3-6-auto-generated-api-documentation: backlog

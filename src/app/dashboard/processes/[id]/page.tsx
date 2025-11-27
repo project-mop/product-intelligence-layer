@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Loader2, BookOpen } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, BookOpen, Play } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -140,6 +140,16 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Test button - Story 3.3 AC: 1 */}
+            {hasPublishedVersion && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/processes/${processId}/test`)}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Test
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => router.push(`/dashboard/processes/${processId}/edit`)}

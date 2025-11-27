@@ -22,6 +22,7 @@ import { ProcessEngine, ProcessEngineError } from "~/server/services/process/eng
 import { AnthropicGateway } from "~/server/services/llm/anthropic";
 import { LLMError } from "~/server/services/llm/types";
 import { getTestGatewayOverride } from "./process.testing";
+import { computeProcessStatus } from "~/lib/process/status";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -195,6 +196,17 @@ const listProcessInput = z.object({
 });
 
 /**
+ * Input schema for listing processes with computed status.
+ * Story 3.4 AC: 1, 4, 5, 6
+ */
+const listWithStatsInput = z.object({
+  search: z.string().optional(),
+  status: z.enum(["DRAFT", "SANDBOX", "PRODUCTION"]).optional(),
+  sortBy: z.enum(["name", "createdAt", "updatedAt"]).optional().default("updatedAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+});
+
+/**
  * Input schema for duplicating a process.
  * AC: 6
  */
@@ -283,6 +295,79 @@ export const processRouter = createTRPCRouter({
           (v) => v.environment === "PRODUCTION"
         ),
       }));
+    }),
+
+  /**
+   * List all processes with computed status for dashboard display.
+   *
+   * Story 3.4 AC: 1, 4, 5, 6
+   * - Returns processes with computed status (DRAFT/SANDBOX/PRODUCTION)
+   * - Supports search by name (case-insensitive)
+   * - Supports filter by computed status
+   * - Supports sorting by name, createdAt, updatedAt
+   */
+  listWithStats: protectedProcedure
+    .input(listWithStatsInput)
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Build where clause with tenant isolation and soft delete filter
+      const where: Prisma.ProcessWhereInput = {
+        tenantId,
+        deletedAt: null,
+      };
+
+      // Add search filter if provided (case-insensitive name search)
+      if (input.search) {
+        where.name = { contains: input.search, mode: "insensitive" };
+      }
+
+      // Build orderBy based on sortBy and sortOrder
+      const orderBy: Prisma.ProcessOrderByWithRelationInput = {
+        [input.sortBy]: input.sortOrder,
+      };
+
+      // Fetch processes with version data for status computation
+      const processes = await db.process.findMany({
+        where,
+        include: {
+          versions: {
+            select: {
+              id: true,
+              environment: true,
+              deprecatedAt: true,
+            },
+          },
+        },
+        orderBy,
+      });
+
+      // Map processes and compute status
+      const processesWithStatus = processes.map((process) => {
+        const status = computeProcessStatus(process.versions);
+        return {
+          id: process.id,
+          name: process.name,
+          description: process.description,
+          status,
+          createdAt: process.createdAt,
+          updatedAt: process.updatedAt,
+        };
+      });
+
+      // Filter by computed status if provided
+      if (input.status) {
+        return processesWithStatus.filter((p) => p.status === input.status);
+      }
+
+      return processesWithStatus;
     }),
 
   /**

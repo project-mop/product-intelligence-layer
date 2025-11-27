@@ -212,6 +212,351 @@ describe("process Router", () => {
     });
   });
 
+  describe("listWithStats", () => {
+    it("should return empty array when no processes exist", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result).toEqual([]);
+    });
+
+    it("should return processes with computed status field", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        name: "Test Process",
+        description: "A test process",
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: process.id,
+        name: "Test Process",
+        description: "A test process",
+        status: "SANDBOX",
+      });
+      expect(result[0]).toHaveProperty("createdAt");
+      expect(result[0]).toHaveProperty("updatedAt");
+    });
+
+    it("should compute status as PRODUCTION when any production version exists", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result[0]?.status).toBe("PRODUCTION");
+    });
+
+    it("should compute status as DRAFT when no versions exist", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      await processFactory.create({ tenantId: tenant.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result[0]?.status).toBe("DRAFT");
+    });
+
+    it("should filter by computed status", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+
+      // Create process with SANDBOX status
+      const sandboxProcess = await processFactory.create({
+        tenantId: tenant.id,
+        name: "Sandbox Process",
+      });
+      await processVersionFactory.create({
+        processId: sandboxProcess.id,
+        environment: "SANDBOX",
+      });
+
+      // Create process with PRODUCTION status
+      const prodProcess = await processFactory.create({
+        tenantId: tenant.id,
+        name: "Production Process",
+      });
+      await processVersionFactory.create({
+        processId: prodProcess.id,
+        environment: "PRODUCTION",
+      });
+
+      // Create process with DRAFT status (no versions)
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "Draft Process",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      // Test SANDBOX filter
+      const sandboxResult = await caller.process.listWithStats({ status: "SANDBOX" });
+      expect(sandboxResult).toHaveLength(1);
+      expect(sandboxResult[0]?.name).toBe("Sandbox Process");
+
+      // Test PRODUCTION filter
+      const prodResult = await caller.process.listWithStats({ status: "PRODUCTION" });
+      expect(prodResult).toHaveLength(1);
+      expect(prodResult[0]?.name).toBe("Production Process");
+
+      // Test DRAFT filter
+      const draftResult = await caller.process.listWithStats({ status: "DRAFT" });
+      expect(draftResult).toHaveLength(1);
+      expect(draftResult[0]?.name).toBe("Draft Process");
+    });
+
+    it("should search by name (case-insensitive)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      await processFactory.create({ tenantId: tenant.id, name: "Product Generator" });
+      await processFactory.create({ tenantId: tenant.id, name: "Email Parser" });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({ search: "product" });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.name).toBe("Product Generator");
+    });
+
+    it("should sort by name ascending", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      await processFactory.create({ tenantId: tenant.id, name: "Zebra" });
+      await processFactory.create({ tenantId: tenant.id, name: "Alpha" });
+      await processFactory.create({ tenantId: tenant.id, name: "Middle" });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+
+      expect(result[0]?.name).toBe("Alpha");
+      expect(result[1]?.name).toBe("Middle");
+      expect(result[2]?.name).toBe("Zebra");
+    });
+
+    it("should sort by name descending", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      await processFactory.create({ tenantId: tenant.id, name: "Zebra" });
+      await processFactory.create({ tenantId: tenant.id, name: "Alpha" });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+
+      expect(result[0]?.name).toBe("Zebra");
+      expect(result[1]?.name).toBe("Alpha");
+    });
+
+    it("should sort by createdAt descending (newest first)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const oldDate = new Date("2024-01-01");
+      const newDate = new Date("2024-06-01");
+
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "Old Process",
+        createdAt: oldDate,
+      });
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "New Process",
+        createdAt: newDate,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+
+      expect(result[0]?.name).toBe("New Process");
+      expect(result[1]?.name).toBe("Old Process");
+    });
+
+    it("should sort by updatedAt ascending (oldest first)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const oldDate = new Date("2024-01-01");
+      const newDate = new Date("2024-06-01");
+
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "Old Process",
+        updatedAt: oldDate,
+      });
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "New Process",
+        updatedAt: newDate,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({
+        sortBy: "updatedAt",
+        sortOrder: "asc",
+      });
+
+      expect(result[0]?.name).toBe("Old Process");
+      expect(result[1]?.name).toBe("New Process");
+    });
+
+    it("should not return processes from other tenants (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+
+      await processFactory.create({ tenantId: tenant1.id, name: "Tenant 1 Process" });
+      await processFactory.create({ tenantId: tenant2.id, name: "Tenant 2 Process" });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.name).toBe("Tenant 1 Process");
+    });
+
+    it("should not return soft-deleted processes", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      await processFactory.create({ tenantId: tenant.id, name: "Active" });
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "Deleted",
+        deletedAt: new Date(),
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.name).toBe("Active");
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(caller.process.listWithStats({})).rejects.toThrow(TRPCError);
+    });
+
+    it("should default to updatedAt desc sorting", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const oldDate = new Date("2024-01-01");
+      const newDate = new Date("2024-06-01");
+
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "Old Process",
+        updatedAt: oldDate,
+      });
+      await processFactory.create({
+        tenantId: tenant.id,
+        name: "New Process",
+        updatedAt: newDate,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      // Call without explicit sort params - should use defaults
+      const result = await caller.process.listWithStats({});
+
+      expect(result[0]?.name).toBe("New Process");
+      expect(result[1]?.name).toBe("Old Process");
+    });
+
+    it("should exclude deprecated versions from status calculation", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Add deprecated PRODUCTION version and active SANDBOX version
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        deprecatedAt: new Date(),
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        deprecatedAt: null,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.listWithStats({});
+
+      // Should be SANDBOX since PRODUCTION is deprecated
+      expect(result[0]?.status).toBe("SANDBOX");
+    });
+  });
+
   describe("get", () => {
     it("should return a process with all versions", async () => {
       const { user, tenant } = await userFactory.createWithTenant();

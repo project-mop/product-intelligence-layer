@@ -1,0 +1,256 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>4</storyId>
+    <title>Intelligence List Dashboard</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-4-intelligence-list-dashboard.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user managing multiple intelligences</asA>
+    <iWant>to view all my intelligences and their endpoints in a dashboard gallery</iWant>
+    <soThat>I can manage, monitor, and quickly access my intelligences effectively</soThat>
+    <tasks>
+      <task id="1" ac="1,4,5,6">Create tRPC Procedure for List with Stats - Add process.listWithStats query with search, status filter, and sort options</task>
+      <task id="2" ac="2,3,8">Create IntelligenceCard Component - Card with name, description, status badge, and hover actions</task>
+      <task id="3" ac="2">Create ProcessStatus Badge Component - Badge for DRAFT/SANDBOX/PRODUCTION states</task>
+      <task id="4" ac="4,5,6">Create Search and Filter Controls - Search input with debounce, status filter, sort dropdown</task>
+      <task id="5" ac="7">Create Empty State Component - Friendly message with Create Intelligence CTA</task>
+      <task id="6" ac="1-8">Create Intelligence List Page - Gallery layout with filters, cards, loading/error/empty states</task>
+      <task id="7" ac="2">Compute Process Status from Versions - Helper function to derive status from ProcessVersion records</task>
+      <task id="8" ac="2,3,4,5,7">Write Unit Tests - Status computation, component rendering tests</task>
+      <task id="9" ac="1,4,5,6">Write Integration Tests - tRPC procedure tests with real database</task>
+      <task id="10" ac="2,3,8">Write Component Tests - Hover states, navigation, truncation</task>
+      <task id="11" ac="1-8">Verification - typecheck, lint, unit tests, integration tests, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Gallery View: Dashboard shows card gallery view of all intelligences (per UX spec)</criterion>
+    <criterion id="2">Card Content: Each card displays intelligence name, description (truncated ~100 chars), status badge (Draft=gray, Sandbox=yellow, Production=green), quick actions on hover</criterion>
+    <criterion id="3">Quick Actions: Hover reveals action buttons: Test, Edit, View Docs</criterion>
+    <criterion id="4">Search: Search by intelligence name (case-insensitive)</criterion>
+    <criterion id="5">Filter: Filter by status (All, Draft, Sandbox, Production)</criterion>
+    <criterion id="6">Sort: Sort by name, date created, or date updated (ascending/descending)</criterion>
+    <criterion id="7">Empty State: Friendly message with "Create Intelligence" CTA when no intelligences exist</criterion>
+    <criterion id="8">Card Navigation: Clicking a card navigates to process detail page (/dashboard/processes/:id)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification: API Generation &amp; Endpoints</title>
+        <section>Story 3.4: Intelligence List Dashboard</section>
+        <snippet>Dashboard shows card gallery view of all intelligences with name, description (truncated), status badge. Quick actions on hover: Test, Edit, View Docs. Search/filter by name and status. Sort by name, date created, date updated.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification: API Generation &amp; Endpoints</title>
+        <section>tRPC Additions (Dashboard)</section>
+        <snippet>process.listWithStats query - List processes with call counts (placeholder until Epic 6). Non-functional: Dashboard list load &lt; 200ms target.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Project Structure</section>
+        <snippet>src/components/dashboard/ for dashboard-specific components. src/app/(dashboard)/processes/ for process management UI. Use tRPC for all internal dashboard operations with protectedProcedure for authenticated routes.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>tRPC Patterns</section>
+        <snippet>Resource-based router naming, always use Zod for input validation, throw TRPCError with appropriate codes, use protectedProcedure for authenticated routes. Tenant isolation: ALWAYS filter by tenantId from session context.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Types Overview</section>
+        <snippet>Unit tests (Vitest) for isolated functions in tests/unit/. Integration tests (Vitest) with real database in tests/integration/. Component tests (Vitest + RTL) in tests/unit/components/. Coverage: 90% lines, 70% functions threshold.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>processRouter</symbol>
+        <lines>1-947</lines>
+        <reason>Existing process router to extend with listWithStats procedure. Contains list procedure (line 220-286) that can be enhanced with status filter and sort options.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/dashboard/processes/page.tsx</path>
+        <kind>page</kind>
+        <symbol>ProcessesPage</symbol>
+        <lines>1-245</lines>
+        <reason>Current processes list page with card grid, search, and skeleton loading. Needs enhancement for status filter, sort dropdown, and updated card design with hover actions.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/badge.tsx</path>
+        <kind>component</kind>
+        <symbol>Badge, badgeVariants</symbol>
+        <lines>1-46</lines>
+        <reason>shadcn/ui Badge component to extend for ProcessStatusBadge. Has default, secondary, destructive, outline variants. Need to add custom colors for DRAFT (gray), SANDBOX (yellow/amber), PRODUCTION (green).</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/card.tsx</path>
+        <kind>component</kind>
+        <symbol>Card, CardContent, CardHeader</symbol>
+        <lines>1-93</lines>
+        <reason>shadcn/ui Card component base for IntelligenceCard. Current design already used in ProcessesPage.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/select.tsx</path>
+        <kind>component</kind>
+        <symbol>Select, SelectContent, SelectItem</symbol>
+        <reason>shadcn/ui Select component for status filter and sort dropdowns.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/input.tsx</path>
+        <kind>component</kind>
+        <symbol>Input</symbol>
+        <reason>shadcn/ui Input component already used for search. Need debounce wrapper (300ms).</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/skeleton.tsx</path>
+        <kind>component</kind>
+        <symbol>Skeleton</symbol>
+        <reason>Skeleton component for loading states, already used in ProcessCardSkeleton.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <reason>Button component for CTAs and quick action buttons.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/utils.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <reason>Class name utility for Tailwind CSS class merging.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>processFactory</symbol>
+        <lines>1-218</lines>
+        <reason>Process factory for tests with build(), create(), createWithTenant(), createMany() methods.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process-version.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>processVersionFactory</symbol>
+        <lines>1-282</lines>
+        <reason>ProcessVersion factory for tests with create(), createProduction(), createDeprecated() methods. Useful for testing status computation logic.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="next" version="^15.2.3">Next.js framework</package>
+        <package name="react" version="^19.0.0">React library</package>
+        <package name="@trpc/client" version="^11.0.0">tRPC client</package>
+        <package name="@trpc/react-query" version="^11.0.0">tRPC React Query integration</package>
+        <package name="@tanstack/react-query" version="^5.69.0">React Query for data fetching</package>
+        <package name="zod" version="^3.24.2">Schema validation</package>
+        <package name="lucide-react" version="^0.555.0">Icon library (Plus, Search, Pencil, etc.)</package>
+        <package name="class-variance-authority" version="^0.7.1">CVA for badge variants</package>
+        <package name="tailwind-merge" version="^3.4.0">Tailwind class merging</package>
+        <package name="@radix-ui/react-select" version="^2.2.6">Select primitive for dropdowns</package>
+      </ecosystem>
+      <ecosystem name="dev">
+        <package name="vitest" version="^4.0.14">Test runner</package>
+        <package name="@testing-library/react" version="^16.3.0">React testing utilities</package>
+        <package name="@vitest/coverage-v8" version="^4.0.14">Coverage reporting</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Use protectedProcedure for all tRPC queries - ensures session-based authentication</constraint>
+    <constraint type="pattern">ALWAYS filter by tenantId from session context for tenant isolation</constraint>
+    <constraint type="pattern">Use shadcn/ui components consistently - Card, Badge, Button, Input, Select</constraint>
+    <constraint type="pattern">Follow existing page layout patterns from dashboard</constraint>
+    <constraint type="performance">Dashboard list load &lt; 200ms target per tech-spec</constraint>
+    <constraint type="style">Status badges: DRAFT (gray/secondary), SANDBOX (yellow/amber), PRODUCTION (green)</constraint>
+    <constraint type="naming">Files: kebab-case (intelligence-card.tsx). Components: PascalCase. Functions: camelCase</constraint>
+    <constraint type="testing">Unit tests for pure functions, integration tests for tRPC routers with real database</constraint>
+    <constraint type="coverage">90% lines, 70% functions minimum coverage threshold</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>process.listWithStats</name>
+      <kind>tRPC query</kind>
+      <signature>input: { search?: string, status?: 'DRAFT' | 'SANDBOX' | 'PRODUCTION', sortBy?: 'name' | 'createdAt' | 'updatedAt', sortOrder?: 'asc' | 'desc' }</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>computeProcessStatus</name>
+      <kind>utility function</kind>
+      <signature>computeProcessStatus(versions: ProcessVersion[]): 'DRAFT' | 'SANDBOX' | 'PRODUCTION'</signature>
+      <path>src/lib/process/status.ts (new)</path>
+    </interface>
+    <interface>
+      <name>IntelligenceCard</name>
+      <kind>React component</kind>
+      <signature>Props: { process: ProcessWithStatus, onTest: () =&gt; void, onEdit: () =&gt; void, onDocs: () =&gt; void }</signature>
+      <path>src/components/dashboard/IntelligenceCard.tsx (new)</path>
+    </interface>
+    <interface>
+      <name>ProcessStatusBadge</name>
+      <kind>React component</kind>
+      <signature>Props: { status: 'DRAFT' | 'SANDBOX' | 'PRODUCTION' }</signature>
+      <path>src/components/dashboard/ProcessStatusBadge.tsx (new)</path>
+    </interface>
+    <interface>
+      <name>ProcessFilters</name>
+      <kind>React component</kind>
+      <signature>Props: { search: string, onSearchChange: (value: string) =&gt; void, status: Status | 'ALL', onStatusChange: (status) =&gt; void, sortBy: SortField, sortOrder: SortOrder, onSortChange: (field, order) =&gt; void }</signature>
+      <path>src/components/dashboard/ProcessFilters.tsx (new)</path>
+    </interface>
+    <interface>
+      <name>ProcessEmptyState</name>
+      <kind>React component</kind>
+      <signature>Props: {}</signature>
+      <path>src/components/dashboard/ProcessEmptyState.tsx (new)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests with Vitest for isolated functions (computeProcessStatus utility). Integration tests with real PostgreSQL database for tRPC procedures. Component tests using @testing-library/react for React components. Follow Arrange-Act-Assert pattern. Test behavior not implementation. Coverage threshold: 90% lines, 70% functions.
+    </standards>
+    <locations>
+      <location>tests/unit/process-status.test.ts</location>
+      <location>tests/unit/components/IntelligenceCard.test.tsx</location>
+      <location>tests/unit/components/ProcessStatusBadge.test.tsx</location>
+      <location>tests/unit/components/ProcessFilters.test.tsx</location>
+      <location>tests/unit/components/ProcessEmptyState.test.tsx</location>
+      <location>tests/integration/process-list.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,4,5,6">Test process.listWithStats returns correct data shape with id, name, description, status, dates</idea>
+      <idea ac="4">Test search filters by name correctly (case-insensitive)</idea>
+      <idea ac="5">Test status filter returns only matching processes (DRAFT, SANDBOX, PRODUCTION)</idea>
+      <idea ac="6">Test sort orders work correctly (name asc/desc, createdAt asc/desc, updatedAt asc/desc)</idea>
+      <idea ac="1">Test tenant isolation - cannot see other tenant's processes</idea>
+      <idea ac="7">Test empty result when no processes exist</idea>
+      <idea ac="2">Test computeProcessStatus: all DRAFT versions returns DRAFT</idea>
+      <idea ac="2">Test computeProcessStatus: any SANDBOX (no PRODUCTION) returns SANDBOX</idea>
+      <idea ac="2">Test computeProcessStatus: any PRODUCTION returns PRODUCTION</idea>
+      <idea ac="2">Test computeProcessStatus: deprecated versions excluded from consideration</idea>
+      <idea ac="2">Test IntelligenceCard renders name, truncated description, status badge</idea>
+      <idea ac="3">Test IntelligenceCard hover shows action buttons (Test, Edit, Docs)</idea>
+      <idea ac="8">Test card click triggers navigation to detail page</idea>
+      <idea ac="2">Test description truncation at ~100 chars with ellipsis</idea>
+      <idea ac="2">Test ProcessStatusBadge renders correct color for each status</idea>
+      <idea ac="4,5,6">Test ProcessFilters emits correct filter values on change</idea>
+      <idea ac="4">Test search input has 300ms debounce</idea>
+      <idea ac="7">Test ProcessEmptyState renders CTA button with correct link</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,77 +1,194 @@
+/**
+ * Intelligence List Page
+ *
+ * Dashboard gallery view of all intelligences with search, filter, and sort.
+ *
+ * @see docs/stories/3-4-intelligence-list-dashboard.md - AC: 1-8
+ */
+
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Plus, Zap, MoreHorizontal, Search, Pencil, Copy, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo } from "react";
+import { Plus, RefreshCw } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import { Badge } from "~/components/ui/badge";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { useState } from "react";
-import { DuplicateDialog } from "~/components/process/DuplicateDialog";
-import { DeleteDialog } from "~/components/process/DeleteDialog";
+  IntelligenceCard,
+  ProcessFilters,
+  ProcessEmptyState,
+  type StatusFilter,
+  type SortField,
+  type SortOrder,
+} from "~/components/dashboard";
 
-function formatDate(date: Date | null): string {
-  if (!date) return "Never";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
+/**
+ * Skeleton card for loading state.
+ */
 function ProcessCardSkeleton() {
   return (
-    <Card className="h-[180px]">
+    <Card className="h-[160px]">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-20" />
         </div>
         <Skeleton className="mt-2 h-4 w-full" />
         <Skeleton className="mt-1 h-4 w-3/4" />
-        <div className="mt-4 flex items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-20" />
-        </div>
+        <div className="h-10 mt-4" />
       </CardContent>
     </Card>
   );
 }
 
-export default function ProcessesPage() {
-  const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [duplicateProcess, setDuplicateProcess] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [deleteProcess, setDeleteProcess] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+/**
+ * Loading skeleton for the entire page.
+ */
+function PageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background p-8">
+      <div className="mx-auto max-w-6xl">
+        {/* Header skeleton */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="mt-1 h-4 w-72" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
 
-  const { data: processes, isLoading, error } = api.process.list.useQuery({
+        {/* Filters skeleton */}
+        <div className="mb-6 flex gap-4">
+          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-44" />
+        </div>
+
+        {/* Grid skeleton */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <ProcessCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Main page content component that uses useSearchParams.
+ * Must be wrapped in Suspense for Next.js 15 static generation.
+ */
+function ProcessesPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read filter state from URL params
+  const search = searchParams.get("search") ?? "";
+  const status = (searchParams.get("status") as StatusFilter) ?? "ALL";
+  const sortBy = (searchParams.get("sortBy") as SortField) ?? "updatedAt";
+  const sortOrder = (searchParams.get("sortOrder") as SortOrder) ?? "desc";
+
+  // Update URL params helper
+  const updateParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === "" || value === "ALL") {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+      // Remove default values to keep URL clean
+      if (params.get("sortBy") === "updatedAt") params.delete("sortBy");
+      if (params.get("sortOrder") === "desc") params.delete("sortOrder");
+
+      const newUrl = params.toString() ? `?${params.toString()}` : "/dashboard/processes";
+      router.push(newUrl, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  // Filter handlers
+  const handleSearchChange = useCallback(
+    (value: string) => updateParams({ search: value || undefined }),
+    [updateParams]
+  );
+
+  const handleStatusChange = useCallback(
+    (value: StatusFilter) => updateParams({ status: value === "ALL" ? undefined : value }),
+    [updateParams]
+  );
+
+  const handleSortChange = useCallback(
+    (field: SortField, order: SortOrder) => updateParams({ sortBy: field, sortOrder: order }),
+    [updateParams]
+  );
+
+  // Fetch processes with the new listWithStats procedure
+  const {
+    data: processes,
+    isLoading,
+    error,
+    refetch,
+  } = api.process.listWithStats.useQuery({
     search: search || undefined,
+    status: status === "ALL" ? undefined : status,
+    sortBy,
+    sortOrder,
   });
 
+  // Action handlers for cards
+  const handleTest = useCallback(
+    (processId: string) => {
+      router.push(`/dashboard/processes/${processId}?tab=test`);
+    },
+    [router]
+  );
+
+  const handleEdit = useCallback(
+    (processId: string) => {
+      router.push(`/dashboard/processes/${processId}/edit`);
+    },
+    [router]
+  );
+
+  const handleDocs = useCallback(
+    (processId: string) => {
+      router.push(`/dashboard/processes/${processId}?tab=docs`);
+    },
+    [router]
+  );
+
+  // Memoize process list to prevent unnecessary re-renders
+  const processList = useMemo(() => processes ?? [], [processes]);
+
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="mx-auto max-w-6xl">
           <div className="rounded-md bg-destructive/10 p-4">
-            <p className="text-sm text-destructive">
-              Failed to load intelligences: {error.message}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-destructive">
+                Failed to load intelligences: {error.message}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -84,7 +201,7 @@ export default function ProcessesPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Intelligences</h1>
+            <h1 className="text-2xl font-bold text-foreground">My Intelligences</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Create and manage your product intelligence definitions
             </p>
@@ -97,17 +214,17 @@ export default function ProcessesPage() {
           </Link>
         </div>
 
-        {/* Search */}
-        <div className="mb-6 flex items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search intelligences..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+        {/* Filters */}
+        <div className="mb-6">
+          <ProcessFilters
+            search={search}
+            onSearchChange={handleSearchChange}
+            status={status}
+            onStatusChange={handleStatusChange}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
         </div>
 
         {/* Process Grid */}
@@ -117,129 +234,33 @@ export default function ProcessesPage() {
               <ProcessCardSkeleton key={i} />
             ))}
           </div>
-        ) : !processes || processes.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="rounded-full bg-primary/10 p-4 mb-4">
-                <Zap className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground">
-                No intelligences yet
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground text-center max-w-sm">
-                Create your first intelligence definition to transform your product data into a working API.
-              </p>
-              <Link href="/dashboard/processes/new" className="mt-6">
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Intelligence
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+        ) : processList.length === 0 ? (
+          <ProcessEmptyState />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {processes.map((process) => (
-              <Card
+            {processList.map((process) => (
+              <IntelligenceCard
                 key={process.id}
-                className="group transition-shadow hover:shadow-md"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">
-                        {process.name}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <Badge
-                        variant={process.hasProductionVersion ? "default" : "secondary"}
-                      >
-                        {process.hasProductionVersion ? "Live" : "Sandbox"}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/dashboard/processes/${process.id}`)}
-                          >
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/dashboard/processes/${process.id}/edit`)}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setDuplicateProcess({ id: process.id, name: process.name })}
-                          >
-                            <Copy className="mr-2 h-4 w-4" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteProcess({ id: process.id, name: process.name })}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  {process.description && (
-                    <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                      {process.description}
-                    </p>
-                  )}
-                  {!process.description && (
-                    <p className="mt-2 text-sm text-muted-foreground/60 italic">
-                      No description
-                    </p>
-                  )}
-                  <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {process.versionCount} version{process.versionCount !== 1 ? "s" : ""}
-                    </span>
-                    <span>Updated {formatDate(process.updatedAt)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                process={process}
+                onTest={() => handleTest(process.id)}
+                onEdit={() => handleEdit(process.id)}
+                onDocs={() => handleDocs(process.id)}
+              />
             ))}
           </div>
         )}
       </div>
-
-      {/* Duplicate Dialog */}
-      {duplicateProcess && (
-        <DuplicateDialog
-          open={!!duplicateProcess}
-          onOpenChange={(open) => {
-            if (!open) setDuplicateProcess(null);
-          }}
-          process={duplicateProcess}
-        />
-      )}
-
-      {/* Delete Dialog */}
-      {deleteProcess && (
-        <DeleteDialog
-          open={!!deleteProcess}
-          onOpenChange={(open) => {
-            if (!open) setDeleteProcess(null);
-          }}
-          process={deleteProcess}
-        />
-      )}
     </div>
+  );
+}
+
+/**
+ * Page export wrapped in Suspense for Next.js 15 static generation.
+ */
+export default function ProcessesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ProcessesPageContent />
+    </Suspense>
   );
 }

@@ -85,7 +85,7 @@ export const authConfig = {
   ],
   adapter: PrismaAdapter(db) as Adapter,
   session: {
-    strategy: "database",
+    strategy: "jwt",
     maxAge: SESSION_MAX_AGE,
   },
   callbacks: {
@@ -113,19 +113,27 @@ export const authConfig = {
       }
       return true;
     },
-    session: async ({ session, user }) => {
-      // Fetch tenantId from database since it's not part of the default User type
-      const dbUser = await db.user.findUnique({
-        where: { id: user.id },
-        select: { tenantId: true },
-      });
-
+    jwt: async ({ token, user }) => {
+      // On sign in, add user info to token
+      if (user) {
+        token.id = user.id;
+        // Fetch tenantId from database
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { tenantId: true },
+        });
+        token.tenantId = dbUser?.tenantId ?? "";
+      }
+      return token;
+    },
+    session: async ({ session, token }) => {
+      // Transfer token data to session
       return {
         ...session,
         user: {
           ...session.user,
-          id: user.id,
-          tenantId: dbUser?.tenantId ?? "",
+          id: token.id as string,
+          tenantId: token.tenantId as string,
         },
       };
     },

@@ -1,0 +1,157 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.2</storyId>
+    <title>Create Intelligence Definition UI</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2-create-intelligence-definition-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>product operations user</asA>
+    <iWant>to create a new intelligence definition through a guided web form</iWant>
+    <soThat>I can define what intelligence I need without technical expertise</soThat>
+    <tasks>
+      <task id="1" ac="1-8">Install required shadcn/ui components (button, card, input, textarea, select, label, badge, tabs, progress, toast) and react-hook-form with @hookform/resolvers</task>
+      <task id="2" ac="1">Create dashboard processes page with "Create Intelligence" button at src/app/(dashboard)/processes/page.tsx</task>
+      <task id="3" ac="2">Create TemplatePicker component with 4 pre-built templates plus blank option</task>
+      <task id="4" ac="3,4">Create SchemaBuilder component for visual JSON Schema field editing</task>
+      <task id="5" ac="3,7">Create multi-step Wizard container at src/app/(dashboard)/processes/new/page.tsx</task>
+      <task id="6" ac="3,4">Implement Step 1 - Name and Description with react-hook-form and Zod validation</task>
+      <task id="7" ac="3,4">Implement Step 2 - Input Schema using SchemaBuilder</task>
+      <task id="8" ac="3,4">Implement Step 3 - Goal Statement with textarea</task>
+      <task id="9" ac="3,4">Implement Step 4 - Output Schema with text/structured toggle</task>
+      <task id="10" ac="5,6">Implement Step 5 - Review and Save calling process.create mutation</task>
+      <task id="11" ac="8">Implement auto-save to localStorage in src/lib/wizard-storage.ts</task>
+      <task id="12" ac="6">Create success page/modal with celebration message</task>
+      <task id="13" ac="1-8">Write integration tests for wizard flow</task>
+      <task id="14" ac="1-8">Verification: typecheck, lint, unit tests, integration tests, manual testing</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Create Intelligence button visible on dashboard for authenticated users</criterion>
+    <criterion id="2">Template Picker displays at least 4 pre-built templates plus blank option</criterion>
+    <criterion id="3">Wizard has 5 steps: Name → Input Schema → Goal → Output Schema → Review</criterion>
+    <criterion id="4">Each step validates required fields before allowing progression</criterion>
+    <criterion id="5">Save as Draft creates a process with SANDBOX version via process.create mutation</criterion>
+    <criterion id="6">Success page shows celebration message and intelligence summary</criterion>
+    <criterion id="7">User can navigate back to edit any previous wizard step</criterion>
+    <criterion id="8">Progress is auto-saved to localStorage (recoverable if browser closes)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Tech Spec" section="Story 2.2: Create Intelligence Definition UI">
+        Detailed technical spec for the wizard flow, template picker, schema builder, tRPC mutations, and all acceptance criteria for this story.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Specification" section="User Journey: Create Intelligence">
+        Design system (shadcn/ui, Warm Coral theme), wizard pattern, template-first approach, progressive disclosure, celebration states.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="tRPC Patterns, Project Structure">
+        T3 stack patterns, tRPC router conventions, protected procedures, file organization, naming conventions.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Types Overview">
+        Vitest for unit/integration, Playwright for E2E, factory patterns, coverage requirements (90%).
+      </doc>
+      <doc path="docs/stories/2-1-intelligence-definition-data-model.md" title="Story 2.1 (Completed)" section="Completion Notes">
+        Backend context: process.create mutation available, ProcessConfig types, JSON Schema validation patterns.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/server/api/routers/process.ts" kind="router" symbol="processRouter" reason="Complete CRUD tRPC router for processes - use process.create mutation for wizard submission">
+        Contains create, update, list, get, duplicate, delete, restore procedures. All tenant-scoped with audit logging.
+      </artifact>
+      <artifact path="src/server/services/process/types.ts" kind="types" symbol="ProcessConfig, ComponentDefinition, AttributeDefinition" reason="TypeScript interfaces for process configuration - wizard must produce data matching these types">
+        Defines ProcessConfig structure for version.config JSON, DEFAULT_PROCESS_CONFIG for defaults.
+      </artifact>
+      <artifact path="src/app/dashboard/api-keys/page.tsx" kind="page" symbol="ApiKeysPage" reason="Reference pattern for dashboard pages with modals, tRPC queries/mutations, and form handling">
+        Shows modal patterns, tRPC useMutation/useQuery hooks, form state management, error display.
+      </artifact>
+      <artifact path="src/lib/id.ts" kind="utility" symbol="generateProcessId" reason="ID generation utilities for new entities">
+        Generates prefixed IDs like proc_*, procv_*.
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="^19.0.0" />
+        <package name="react-dom" version="^19.0.0" />
+        <package name="next" version="^15.2.3" />
+        <package name="@trpc/client" version="^11.0.0" />
+        <package name="@trpc/react-query" version="^11.0.0" />
+        <package name="@tanstack/react-query" version="^5.69.0" />
+        <package name="zod" version="^3.24.2" />
+        <package name="ajv" version="^8.17.1" note="JSON Schema Draft 7 validation" />
+        <package name="tailwindcss" version="^4.0.15" />
+        <package name="@testing-library/react" version="^16.3.0" />
+        <package name="vitest" version="^4.0.14" />
+        <package name="@playwright/test" version="^1.57.0" />
+      </ecosystem>
+      <toInstall note="Required for this story">
+        <package name="react-hook-form" version="^7.x" purpose="Form state management for wizard steps" />
+        <package name="@hookform/resolvers" version="^3.x" purpose="Zod integration for react-hook-form validation" />
+        <shadcn>button, card, input, textarea, select, label, badge, tabs, progress, toast, dialog, alert-dialog, skeleton, dropdown-menu, tooltip, switch, separator</shadcn>
+      </toInstall>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">All dashboard operations use tRPC (not REST)</constraint>
+    <constraint source="architecture.md">All database queries must include tenantId filter for tenant isolation</constraint>
+    <constraint source="architecture.md">Use protectedProcedure for authenticated routes</constraint>
+    <constraint source="ux-design-specification.md">Follow Warm Coral theme (Primary: #f97316)</constraint>
+    <constraint source="ux-design-specification.md">Use shadcn/ui components with Tailwind CSS</constraint>
+    <constraint source="tech-spec-epic-2.md">JSON schemas must be valid JSON Schema Draft 7 (validated with AJV)</constraint>
+    <constraint source="tech-spec-epic-2.md">New processes start with SANDBOX environment, version "1.0.0"</constraint>
+    <constraint source="testing-strategy-mvp.md">90% coverage requirement - write component tests with Vitest + Testing Library</constraint>
+    <constraint source="story-2.2.md">Do NOT add E2E tests - deferred to later epic</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="process.create" kind="tRPC mutation" path="src/server/api/routers/process.ts">
+      <signature>
+        Input: { name: string, description?: string, inputSchema: JSONSchema, outputSchema: JSONSchema, config?: ProcessConfigInput }
+        Output: { process: Process, version: ProcessVersion }
+      </signature>
+      Creates Process + initial ProcessVersion with SANDBOX environment. Generates proc_* and procv_* IDs. Logs audit event.
+    </interface>
+    <interface name="process.list" kind="tRPC query" path="src/server/api/routers/process.ts">
+      <signature>
+        Input: { status?: "SANDBOX" | "PRODUCTION", search?: string }
+        Output: Process[] with versionCount, latestVersionStatus, hasProductionVersion
+      </signature>
+      For process list dashboard page.
+    </interface>
+    <interface name="ProcessConfig" kind="TypeScript interface" path="src/server/services/process/types.ts">
+      <signature>
+        { systemPrompt, goal, inputSchemaDescription, outputSchemaDescription, maxTokens, temperature, cacheTtlSeconds, cacheEnabled, requestsPerMinute, components? }
+      </signature>
+      Stored in ProcessVersion.config JSON column.
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Vitest + React Testing Library for component unit tests. Vitest for integration tests against real PostgreSQL database.
+      90% coverage threshold enforced in CI. Use renderWithProviders helper with mock session for authenticated components.
+      Follow Arrange-Act-Assert pattern. Test behavior, not implementation.
+    </standards>
+    <locations>
+      <location>tests/unit/components/ - Component unit tests (*.test.tsx)</location>
+      <location>tests/integration/ - tRPC router integration tests (*.test.ts)</location>
+      <location>tests/support/render.tsx - React render utilities with providers</location>
+      <location>tests/support/factories/ - Test data factories</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test "Create Intelligence" button renders and navigates to /processes/new</idea>
+      <idea ac="2">Test TemplatePicker displays 4 templates + blank option, handles selection callback</idea>
+      <idea ac="3">Test wizard step navigation (forward/backward), step indicator shows current step</idea>
+      <idea ac="4">Test form validation - name required, schema fields non-empty before Next enabled</idea>
+      <idea ac="5">Test process.create mutation called with correct data structure on Save</idea>
+      <idea ac="6">Test success state renders celebration message with process name</idea>
+      <idea ac="7">Test Back button returns to previous step with data preserved</idea>
+      <idea ac="8">Test localStorage auto-save on step change, resume prompt on mount with saved data</idea>
+      <idea ac="all">Test SchemaBuilder add/remove fields, type selection, required toggle</idea>
+    </ideas>
+  </tests>
+</story-context>

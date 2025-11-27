@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, Settings2 } from "lucide-react";
 import type { JSONSchema7 } from "json-schema";
 
 import { Button } from "~/components/ui/button";
@@ -17,7 +17,10 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Card, CardContent } from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
+import { ComponentEditor } from "./ComponentEditor";
+import type { ComponentDefinition } from "./types";
 
 /**
  * Supported field types for the schema builder.
@@ -226,22 +229,39 @@ interface SchemaBuilderProps {
   onChange: (schema: JSONSchema7) => void;
   /** Show validation errors */
   showErrors?: boolean;
+  /** Whether advanced mode is enabled */
+  advancedMode?: boolean;
+  /** Callback when advanced mode toggle changes */
+  onAdvancedModeChange?: (enabled: boolean) => void;
+  /** Initial components for advanced mode */
+  initialComponents?: ComponentDefinition[];
+  /** Callback when components change */
+  onComponentsChange?: (components: ComponentDefinition[]) => void;
 }
 
 /**
  * Visual schema builder for creating JSON Schema Draft 7.
  * Allows users to add/remove fields with type selection and required toggle.
+ * In advanced mode, also supports hierarchical component definitions.
  */
 export function SchemaBuilder({
   initialSchema,
   onChange,
   showErrors = false,
+  advancedMode = false,
+  onAdvancedModeChange,
+  initialComponents,
+  onComponentsChange,
 }: SchemaBuilderProps) {
   const [fields, setFields] = useState<SchemaField[]>(() => {
     if (initialSchema) {
       return jsonSchemaToFields(initialSchema);
     }
     return [];
+  });
+
+  const [components, setComponents] = useState<ComponentDefinition[]>(() => {
+    return initialComponents ?? [];
   });
 
   // Track which field names are duplicates
@@ -261,6 +281,19 @@ export function SchemaBuilder({
   useEffect(() => {
     onChange(fieldsToJsonSchema(fields));
   }, [fields, onChange]);
+
+  // Notify parent when components change
+  useEffect(() => {
+    onComponentsChange?.(components);
+  }, [components, onComponentsChange]);
+
+  const handleComponentsChange = useCallback((newComponents: ComponentDefinition[]) => {
+    setComponents(newComponents);
+  }, []);
+
+  const handleAdvancedModeToggle = useCallback((enabled: boolean) => {
+    onAdvancedModeChange?.(enabled);
+  }, [onAdvancedModeChange]);
 
   const handleAddField = useCallback(() => {
     setFields((prev) => [
@@ -289,52 +322,88 @@ export function SchemaBuilder({
 
   return (
     <div className="space-y-4">
-      {fields.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            No fields defined yet. Add your first field to get started.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {fields.map((field, index) => {
-            const isEmpty = !field.name.trim();
-            const isDuplicate = duplicateNames.has(
-              field.name.trim().toLowerCase()
-            );
-            const hasError = showErrors && (isEmpty || isDuplicate);
-
-            return (
-              <SchemaFieldRow
-                key={field.id}
-                field={field}
-                onChange={(f) => handleFieldChange(index, f)}
-                onRemove={() => handleFieldRemove(index)}
-                hasError={hasError}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      <Button variant="outline" onClick={handleAddField} className="w-full">
-        <Plus className="mr-2 h-4 w-4" />
-        Add Field
-      </Button>
-
-      {showErrors && fields.length > 0 && (
-        <div className="space-y-1">
-          {fields.some((f) => !f.name.trim()) && (
-            <p className="text-sm text-destructive">
-              All fields must have a name.
+      {/* Advanced Mode Toggle */}
+      <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <Label htmlFor="advanced-mode" className="text-sm font-medium cursor-pointer">
+              Advanced Mode
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Enable to define hierarchical components
             </p>
-          )}
-          {duplicateNames.size > 0 && (
-            <p className="text-sm text-destructive">
-              Field names must be unique.
-            </p>
-          )}
+          </div>
         </div>
+        <Switch
+          id="advanced-mode"
+          checked={advancedMode}
+          onCheckedChange={handleAdvancedModeToggle}
+        />
+      </div>
+
+      {/* Fields Section */}
+      <div>
+        <Label className="text-sm font-semibold mb-2 block">Fields</Label>
+        {fields.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No fields defined yet. Add your first field to get started.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {fields.map((field, index) => {
+              const isEmpty = !field.name.trim();
+              const isDuplicate = duplicateNames.has(
+                field.name.trim().toLowerCase()
+              );
+              const hasError = showErrors && (isEmpty || isDuplicate);
+
+              return (
+                <SchemaFieldRow
+                  key={field.id}
+                  field={field}
+                  onChange={(f) => handleFieldChange(index, f)}
+                  onRemove={() => handleFieldRemove(index)}
+                  hasError={hasError}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        <Button variant="outline" onClick={handleAddField} className="w-full mt-3">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Field
+        </Button>
+
+        {showErrors && fields.length > 0 && (
+          <div className="space-y-1 mt-2">
+            {fields.some((f) => !f.name.trim()) && (
+              <p className="text-sm text-destructive">
+                All fields must have a name.
+              </p>
+            )}
+            {duplicateNames.size > 0 && (
+              <p className="text-sm text-destructive">
+                Field names must be unique.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Components Section (Advanced Mode Only) */}
+      {advancedMode && (
+        <>
+          <Separator />
+          <ComponentEditor
+            components={components}
+            onChange={handleComponentsChange}
+            showErrors={showErrors}
+          />
+        </>
       )}
     </div>
   );

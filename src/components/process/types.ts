@@ -6,6 +6,48 @@ import type { JSONSchema7 } from "json-schema";
 export type OutputType = "text" | "structured";
 
 /**
+ * Attribute type for component attributes.
+ * Matches AttributeDefinition type from server types.
+ */
+export type AttributeType = "string" | "number" | "boolean" | "array" | "object";
+
+/**
+ * Attribute definition within a component.
+ * Mirrors server-side AttributeDefinition.
+ */
+export interface AttributeDefinition {
+  /** Unique ID for React keys */
+  id: string;
+  /** Attribute name */
+  name: string;
+  /** Data type of the attribute */
+  type: AttributeType;
+  /** Human-readable description */
+  description?: string;
+  /** Whether this attribute is required */
+  required: boolean;
+}
+
+/**
+ * Component definition for structured intelligence.
+ * Mirrors server-side ComponentDefinition with added client-side fields.
+ */
+export interface ComponentDefinition {
+  /** Unique ID for React keys */
+  id: string;
+  /** Component name/identifier */
+  name: string;
+  /** Component type classification */
+  type: string;
+  /** Attributes within this component */
+  attributes?: AttributeDefinition[];
+  /** Nested subcomponents (max 3 levels deep) */
+  subcomponents?: ComponentDefinition[];
+  /** Whether this component is expanded in the tree view */
+  expanded?: boolean;
+}
+
+/**
  * Wizard data structure containing all form data across steps.
  * This is the shape of data that flows through the wizard.
  */
@@ -24,6 +66,10 @@ export interface WizardData {
   goal: string;
   /** Whether output is simple text or structured JSON */
   outputType: OutputType;
+  /** Whether advanced mode is enabled (shows component editor) */
+  advancedMode?: boolean;
+  /** Component hierarchy for structured intelligence (advanced mode) */
+  components?: ComponentDefinition[];
 }
 
 /**
@@ -45,6 +91,8 @@ export const defaultWizardData: WizardData = {
   },
   goal: "",
   outputType: "structured",
+  advancedMode: false,
+  components: [],
 };
 
 /**

@@ -1078,4 +1078,217 @@ describe("process Router", () => {
       expect(result.process.inputSchema).toEqual(validSchema);
     });
   });
+
+  describe("components (Story 2.3)", () => {
+    it("should create process with components in config", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.create({
+        name: "Process with Components",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        config: {
+          goal: "Test components",
+          components: [
+            {
+              name: "ProductVariant",
+              type: "Variant",
+              attributes: [
+                { name: "sku", type: "string", required: true },
+                { name: "price", type: "number", required: true },
+              ],
+            },
+          ],
+        },
+      });
+
+      const config = result.version.config as Record<string, unknown>;
+      expect(config.components).toBeDefined();
+      expect(Array.isArray(config.components)).toBe(true);
+
+      const components = config.components as Array<{
+        name: string;
+        type: string;
+        attributes: Array<{ name: string; type: string; required: boolean }>;
+      }>;
+      expect(components).toHaveLength(1);
+      expect(components[0]?.name).toBe("ProductVariant");
+      expect(components[0]?.attributes).toHaveLength(2);
+    });
+
+    it("should create process with nested components (3 levels)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.create({
+        name: "Process with Nested Components",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        config: {
+          goal: "Test nested components",
+          components: [
+            {
+              name: "Level1",
+              type: "L1",
+              subcomponents: [
+                {
+                  name: "Level2",
+                  type: "L2",
+                  subcomponents: [
+                    {
+                      name: "Level3",
+                      type: "L3",
+                      attributes: [
+                        { name: "value", type: "string", required: false },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      const config = result.version.config as Record<string, unknown>;
+      const components = config.components as Array<{
+        name: string;
+        subcomponents?: Array<{
+          name: string;
+          subcomponents?: Array<{ name: string }>;
+        }>;
+      }>;
+
+      expect(components[0]?.name).toBe("Level1");
+      expect(components[0]?.subcomponents?.[0]?.name).toBe("Level2");
+      expect(components[0]?.subcomponents?.[0]?.subcomponents?.[0]?.name).toBe("Level3");
+    });
+
+    it("should reject components nested more than 3 levels deep", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.create({
+          name: "Process with Too Deep Components",
+          inputSchema: { type: "object" },
+          outputSchema: { type: "object" },
+          config: {
+            goal: "Test depth validation",
+            components: [
+              {
+                name: "Level1",
+                type: "L1",
+                subcomponents: [
+                  {
+                    name: "Level2",
+                    type: "L2",
+                    subcomponents: [
+                      {
+                        name: "Level3",
+                        type: "L3",
+                        subcomponents: [
+                          {
+                            name: "Level4", // This is too deep!
+                            type: "L4",
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        })
+      ).rejects.toThrow(/cannot be nested more than 3 levels/i);
+    });
+
+    it("should retrieve process with components intact", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const createResult = await caller.process.create({
+        name: "Process with Components to Retrieve",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        config: {
+          goal: "Test retrieval",
+          components: [
+            {
+              name: "TestComponent",
+              type: "Test",
+              attributes: [
+                { name: "field1", type: "string", description: "Test field", required: true },
+              ],
+            },
+          ],
+        },
+      });
+
+      const getResult = await caller.process.get({ id: createResult.process.id });
+
+      // The process.get returns process with versions
+      expect(getResult.versions).toHaveLength(1);
+      const config = getResult.versions[0]?.config as Record<string, unknown>;
+      const components = config.components as Array<{
+        name: string;
+        attributes: Array<{ name: string; description?: string }>;
+      }>;
+
+      expect(components[0]?.name).toBe("TestComponent");
+      expect(components[0]?.attributes[0]?.description).toBe("Test field");
+    });
+
+    it("should validate component attribute types", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      // Valid attribute types: string, number, boolean, array, object
+      const result = await caller.process.create({
+        name: "Process with All Attribute Types",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        config: {
+          goal: "Test attribute types",
+          components: [
+            {
+              name: "AllTypes",
+              type: "Test",
+              attributes: [
+                { name: "stringField", type: "string", required: false },
+                { name: "numberField", type: "number", required: false },
+                { name: "booleanField", type: "boolean", required: false },
+                { name: "arrayField", type: "array", required: false },
+                { name: "objectField", type: "object", required: false },
+              ],
+            },
+          ],
+        },
+      });
+
+      const config = result.version.config as Record<string, unknown>;
+      const components = config.components as Array<{
+        attributes: Array<{ type: string }>;
+      }>;
+
+      expect(components[0]?.attributes).toHaveLength(5);
+    });
+  });
 });

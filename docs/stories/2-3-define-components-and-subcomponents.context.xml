@@ -1,0 +1,290 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Define Components and Subcomponents</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-3-define-components-and-subcomponents.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user defining a complex product</asA>
+    <iWant>to specify components and subcomponents in my intelligence definition</iWant>
+    <soThat>the intelligence understands the hierarchical structure of my products</soThat>
+    <tasks>
+      <task id="1" name="Extend SchemaBuilder with Component Support">
+        <subtask>Add "Advanced Mode" toggle to SchemaBuilder component</subtask>
+        <subtask>Create ComponentEditor.tsx subcomponent for editing a single component</subtask>
+        <subtask>Add "Add Component" button visible only in advanced mode</subtask>
+        <subtask>Implement component fields: name, type, attributes array</subtask>
+        <subtask>Support recursive subcomponents array for nesting</subtask>
+        <subtask>Validate component names are unique within parent level</subtask>
+        <subtask>Enforce maximum nesting depth of 3 levels with user feedback</subtask>
+      </task>
+      <task id="2" name="Create ComponentTree Visualization">
+        <subtask>Create ComponentTree.tsx component for tree rendering</subtask>
+        <subtask>Use indentation and visual connectors for hierarchy</subtask>
+        <subtask>Add expand/collapse controls for each component level</subtask>
+        <subtask>Show component name, type, and attribute count at each node</subtask>
+        <subtask>Highlight currently selected component for editing</subtask>
+      </task>
+      <task id="3" name="Implement Component Attribute Management">
+        <subtask>Extend existing attribute editor pattern from SchemaBuilder</subtask>
+        <subtask>Allow adding/removing attributes per component</subtask>
+        <subtask>Each attribute has: name, type, description, required flag</subtask>
+        <subtask>Validate attribute names are unique within component</subtask>
+        <subtask>Use shadcn/ui form components for consistent styling</subtask>
+      </task>
+      <task id="4" name="Integrate Components into Wizard Flow">
+        <subtask>Update InputSchemaStep.tsx to include ComponentEditor when advanced mode enabled</subtask>
+        <subtask>Update OutputSchemaStep.tsx to optionally include components for structured output</subtask>
+        <subtask>Pass components data through wizard state</subtask>
+        <subtask>Include components in process.create mutation payload</subtask>
+        <subtask>Update localStorage persistence to include component data</subtask>
+      </task>
+      <task id="5" name="Update Backend Types and Validation">
+        <subtask>Verify ComponentDefinition interface in src/server/services/process/types.ts</subtask>
+        <subtask>Add Zod schema for component validation in process.create input</subtask>
+        <subtask>Ensure components are properly serialized/deserialized from ProcessConfig JSON</subtask>
+        <subtask>Add validation for maximum nesting depth in backend</subtask>
+      </task>
+      <task id="6" name="Write Tests">
+        <subtask>Unit tests for ComponentEditor component</subtask>
+        <subtask>Unit tests for ComponentTree component</subtask>
+        <subtask>Unit tests for component validation (naming, nesting depth)</subtask>
+        <subtask>Integration test: create process with components via tRPC</subtask>
+        <subtask>Integration test: verify components persisted and retrieved correctly</subtask>
+        <subtask>Test nested components to 3 levels deep</subtask>
+      </task>
+      <task id="7" name="Verification">
+        <subtask>Run pnpm typecheck - zero errors</subtask>
+        <subtask>Run pnpm lint - zero new errors</subtask>
+        <subtask>Run pnpm test:unit - all tests pass</subtask>
+        <subtask>Run pnpm test:integration - all tests pass</subtask>
+        <subtask>Manual testing: create intelligence with 3-level component hierarchy</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Schema Builder shows "Add Component" option when in advanced mode</criterion>
+    <criterion id="2">Components can be named with a custom type (e.g., "ProductVariant", "Specification")</criterion>
+    <criterion id="3">Subcomponents can be nested at least 3 levels deep</criterion>
+    <criterion id="4">Each component can have its own attributes list (name, type, description, required)</criterion>
+    <criterion id="5">Component hierarchy is visually represented as an indented tree structure</criterion>
+    <criterion id="6">Components are saved in ProcessConfig.components array and persisted via process.create/process.update mutations</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Story 2.3: Define Components and Subcomponents</section>
+        <snippet>Components hierarchy support (nested JSON structures). Acceptance criteria: Schema Builder shows "Add Component" option, components named with custom type, subcomponents nested 3+ levels, visual tree representation, saved in ProcessConfig.components.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Data Models and Contracts</section>
+        <snippet>ComponentDefinition interface with name, type, attributes array, and recursive subcomponents. AttributeDefinition with name, type (string/number/boolean/array/object), description, required flag.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 2.3: Define Components and Subcomponents</section>
+        <snippet>User can specify components with hierarchical nesting at least 3 levels deep. Each component has own attributes. UI visually represents component hierarchy. Covers FR-104.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>tRPC Patterns</section>
+        <snippet>Use Zod for input validation, protectedProcedure for authenticated routes. Store JSON schemas in JSONB columns for flexible definitions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Component Tests</section>
+        <snippet>Use Vitest + Testing Library for component tests. renderWithProviders for React context. 50% minimum coverage for MVP.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-2-create-intelligence-definition-ui.md</path>
+        <title>Story 2.2 Reference</title>
+        <section>Completion Notes</section>
+        <snippet>SchemaBuilder created with visual field editor, type selector, required toggle. 37 unit tests. react-hook-form with zodResolver pattern. localStorage auto-save via wizard-storage.ts.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>src/components/process/SchemaBuilder.tsx</path>
+        <kind>component</kind>
+        <symbol>SchemaBuilder</symbol>
+        <lines>235-341</lines>
+        <reason>Primary component to extend with advanced mode and component editing support. Contains field editing pattern to reuse for component attributes.</reason>
+      </file>
+      <file>
+        <path>src/components/process/SchemaBuilder.tsx</path>
+        <kind>utility</kind>
+        <symbol>SchemaField, fieldsToJsonSchema, jsonSchemaToFields</symbol>
+        <lines>25-106</lines>
+        <reason>Existing field types and conversion utilities to reference when building component types and serialization.</reason>
+      </file>
+      <file>
+        <path>src/components/process/types.ts</path>
+        <kind>types</kind>
+        <symbol>WizardData, StepProps, WizardStep</symbol>
+        <lines>1-89</lines>
+        <reason>Wizard state types to extend with components field. StepProps pattern for step components.</reason>
+      </file>
+      <file>
+        <path>src/server/services/process/types.ts</path>
+        <kind>types</kind>
+        <symbol>ComponentDefinition, AttributeDefinition, ProcessConfig</symbol>
+        <lines>1-95</lines>
+        <reason>Backend types for components already defined. Use these interfaces for frontend component types.</reason>
+      </file>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>processRouter, componentSchema, attributeSchema</symbol>
+        <lines>50-116</lines>
+        <reason>Zod validation for components already exists. Verify recursive componentSchema handles 3-level nesting.</reason>
+      </file>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>create mutation</symbol>
+        <lines>292-368</lines>
+        <reason>Create mutation already accepts config.components. Verify persistence path works correctly.</reason>
+      </file>
+      <file>
+        <path>src/components/process/steps/InputSchemaStep.tsx</path>
+        <kind>component</kind>
+        <symbol>InputSchemaStep</symbol>
+        <reason>Step component to extend with component editing in advanced mode. Follow existing pattern.</reason>
+      </file>
+      <file>
+        <path>src/components/process/steps/OutputSchemaStep.tsx</path>
+        <kind>component</kind>
+        <symbol>OutputSchemaStep</symbol>
+        <reason>Step component that may need optional component support for structured output.</reason>
+      </file>
+      <file>
+        <path>src/lib/wizard-storage.ts</path>
+        <kind>utility</kind>
+        <symbol>saveWizardDraft, loadWizardDraft, SavedDraft</symbol>
+        <lines>1-102</lines>
+        <reason>Auto-save utilities. WizardData merging will automatically include new components field.</reason>
+      </file>
+      <file>
+        <path>tests/unit/components/process/SchemaBuilder.test.tsx</path>
+        <kind>test</kind>
+        <symbol>SchemaBuilder tests</symbol>
+        <reason>Existing test patterns for SchemaBuilder. Follow same structure for ComponentEditor tests.</reason>
+      </file>
+      <file>
+        <path>tests/unit/wizard-storage.test.ts</path>
+        <kind>test</kind>
+        <symbol>wizard-storage tests</symbol>
+        <reason>12 tests for localStorage utilities. May need additional tests for component data persistence.</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="^19.0.0" />
+        <package name="react-hook-form" version="^7.66.1" />
+        <package name="@hookform/resolvers" version="^5.2.2" />
+        <package name="zod" version="^3.24.2" />
+        <package name="lucide-react" version="^0.555.0" />
+        <package name="@radix-ui/react-switch" version="^1.2.6" />
+        <package name="@radix-ui/react-select" version="^2.2.6" />
+        <package name="class-variance-authority" version="^0.7.1" />
+        <package name="tailwind-merge" version="^3.4.0" />
+      </ecosystem>
+      <ecosystem name="shadcn-ui">
+        <component name="button" />
+        <component name="card" />
+        <component name="input" />
+        <component name="textarea" />
+        <component name="select" />
+        <component name="switch" />
+        <component name="label" />
+        <component name="separator" />
+        <component name="tooltip" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architectural">Use tRPC for all dashboard operations (ADR-003)</constraint>
+    <constraint type="architectural">Store components in ProcessVersion.config JSON column</constraint>
+    <constraint type="data">Maximum nesting depth of 3 levels for subcomponents</constraint>
+    <constraint type="validation">Component names must be unique within their parent level</constraint>
+    <constraint type="validation">Attribute names must be unique within component</constraint>
+    <constraint type="ui">Follow existing SchemaBuilder visual patterns for consistency</constraint>
+    <constraint type="ui">Use shadcn/ui components with Warm Coral theme (#f97316)</constraint>
+    <constraint type="testing">50% minimum coverage for MVP</constraint>
+    <constraint type="testing">Follow Vitest + Testing Library patterns from existing tests</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ComponentDefinition</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface ComponentDefinition { name: string; type: string; attributes?: AttributeDefinition[]; subcomponents?: ComponentDefinition[]; }</signature>
+      <path>src/server/services/process/types.ts</path>
+    </interface>
+    <interface>
+      <name>AttributeDefinition</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface AttributeDefinition { name: string; type: 'string' | 'number' | 'boolean' | 'array' | 'object'; description?: string; required: boolean; }</signature>
+      <path>src/server/services/process/types.ts</path>
+    </interface>
+    <interface>
+      <name>componentSchema (Zod)</name>
+      <kind>Zod validation schema</kind>
+      <signature>z.lazy(() => z.object({ name: z.string().min(1), type: z.string().min(1), attributes: z.array(attributeSchema).optional(), subcomponents: z.array(componentSchema).optional() }))</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>process.create mutation</name>
+      <kind>tRPC mutation</kind>
+      <signature>input: { name, description?, inputSchema, outputSchema, config?: { ...components?: ComponentDefinition[] } } → { process, version }</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>WizardData</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface WizardData { templateId?, name, description?, inputSchema, outputSchema, goal, outputType } // Extend with: components?: ComponentDefinition[]</signature>
+      <path>src/components/process/types.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with Testing Library for React components. Integration tests run against real PostgreSQL database. Component tests should use renderWithProviders from tests/support/render.tsx. Follow AAA pattern (Arrange-Act-Assert). Mock external dependencies in unit tests. 50% minimum coverage for MVP.
+    </standards>
+    <locations>
+      <location>tests/unit/components/process/*.test.tsx</location>
+      <location>tests/unit/*.test.ts</location>
+      <location>tests/integration/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test advanced mode toggle shows/hides Add Component button</idea>
+      <idea ac="2">Test component can be created with custom name and type</idea>
+      <idea ac="3">Test 3-level nesting: component → subcomponent → sub-subcomponent</idea>
+      <idea ac="3">Test 4th level nesting is rejected with user feedback</idea>
+      <idea ac="4">Test adding/removing attributes to a component</idea>
+      <idea ac="4">Test attribute type selection and required toggle</idea>
+      <idea ac="5">Test ComponentTree renders hierarchy with correct indentation</idea>
+      <idea ac="5">Test expand/collapse functionality</idea>
+      <idea ac="6">Integration: create process with components via tRPC, verify persisted</idea>
+      <idea ac="6">Integration: retrieve process, verify components structure intact</idea>
+      <idea ac="6">Test localStorage persistence includes component data</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, AlertCircle, Loader2 } from "lucide-react";
+import { Check, AlertCircle, Loader2, Layers } from "lucide-react";
 import type { JSONSchema7 } from "json-schema";
 
 import { Button } from "~/components/ui/button";
@@ -16,6 +16,8 @@ import {
 } from "~/components/ui/dialog";
 import { api } from "~/trpc/react";
 import type { StepProps } from "../types";
+import { componentsToServerFormat } from "../ComponentEditor";
+import { getComponentCount } from "../ComponentTree";
 
 /**
  * Get field count from JSON Schema.
@@ -97,6 +99,11 @@ export function ReviewStep({ data, onNext, onBack }: StepProps) {
   });
 
   const handleSave = () => {
+    // Convert components to server format (strip client-only fields)
+    const serverComponents = data.components?.length
+      ? componentsToServerFormat(data.components)
+      : undefined;
+
     createProcess.mutate({
       name: data.name,
       description: data.description,
@@ -109,6 +116,7 @@ export function ReviewStep({ data, onNext, onBack }: StepProps) {
           data.outputType === "text"
             ? "Simple text output"
             : `Structured JSON with ${getFieldCount(data.outputSchema)} fields`,
+        components: serverComponents,
       },
     });
   };
@@ -120,6 +128,8 @@ export function ReviewStep({ data, onNext, onBack }: StepProps) {
 
   const inputFields = getFieldNames(data.inputSchema);
   const outputFields = getFieldNames(data.outputSchema);
+  const hasComponents = (data.components?.length ?? 0) > 0;
+  const componentCount = hasComponents ? getComponentCount(data.components ?? []) : 0;
 
   return (
     <div className="space-y-6">
@@ -178,6 +188,27 @@ export function ReviewStep({ data, onNext, onBack }: StepProps) {
               )}
             </div>
           </div>
+
+          {/* Components (Advanced Mode) */}
+          {hasComponents && (
+            <>
+              <Separator className="my-3" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Components:</span>
+                </div>
+                <div className="mt-2">
+                  <Badge variant="outline">
+                    {componentCount} component{componentCount !== 1 ? "s" : ""} defined
+                  </Badge>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Advanced mode enabled with hierarchical components
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Goal */}

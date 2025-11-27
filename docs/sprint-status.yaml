@@ -51,7 +51,7 @@ development_status:
   2-0-development-seed-data: done  # NEW: seed data for testing
   2-1-intelligence-definition-data-model: done
   2-2-create-intelligence-definition-ui: done
-  2-3-define-components-and-subcomponents: backlog
+  2-3-define-components-and-subcomponents: done
   2-4-edit-intelligence-definition: backlog
   2-5-duplicate-intelligence-definition: backlog
   2-6-delete-intelligence-definition: backlog

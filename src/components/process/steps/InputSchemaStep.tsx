@@ -5,7 +5,8 @@ import type { JSONSchema7 } from "json-schema";
 
 import { Button } from "~/components/ui/button";
 import { SchemaBuilder, jsonSchemaToFields, validateSchema } from "../SchemaBuilder";
-import type { StepProps } from "../types";
+import { validateComponents } from "../ComponentEditor";
+import type { StepProps, ComponentDefinition } from "../types";
 
 /**
  * Step 2: Input Schema
@@ -28,11 +29,32 @@ export function InputSchemaStep({
     [onDataChange]
   );
 
+  const handleAdvancedModeChange = useCallback(
+    (enabled: boolean) => {
+      onDataChange({ advancedMode: enabled });
+    },
+    [onDataChange]
+  );
+
+  const handleComponentsChange = useCallback(
+    (components: ComponentDefinition[]) => {
+      onDataChange({ components });
+    },
+    [onDataChange]
+  );
+
   const handleNext = () => {
     const fields = jsonSchemaToFields(data.inputSchema);
     if (!validateSchema(fields)) {
       setShowErrors(true);
       return;
+    }
+    // If advanced mode is enabled, also validate components
+    if (data.advancedMode && data.components && data.components.length > 0) {
+      if (!validateComponents(data.components)) {
+        setShowErrors(true);
+        return;
+      }
     }
     onNext();
   };
@@ -59,6 +81,10 @@ export function InputSchemaStep({
         initialSchema={data.inputSchema}
         onChange={handleSchemaChange}
         showErrors={showErrors}
+        advancedMode={data.advancedMode ?? false}
+        onAdvancedModeChange={handleAdvancedModeChange}
+        initialComponents={data.components}
+        onComponentsChange={handleComponentsChange}
       />
 
       <div className="flex justify-between pt-4">

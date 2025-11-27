@@ -58,6 +58,11 @@ const attributeSchema = z.object({
 });
 
 /**
+ * Maximum nesting depth for components.
+ */
+const MAX_COMPONENT_DEPTH = 3;
+
+/**
  * Component definition type for Zod schema.
  */
 interface ComponentInput {
@@ -70,6 +75,26 @@ interface ComponentInput {
     required: boolean;
   }>;
   subcomponents?: ComponentInput[];
+}
+
+/**
+ * Validate that components don't exceed maximum nesting depth.
+ */
+function validateComponentDepth(
+  components: ComponentInput[],
+  currentDepth = 1
+): boolean {
+  if (currentDepth > MAX_COMPONENT_DEPTH) {
+    return false;
+  }
+  for (const comp of components) {
+    if (comp.subcomponents?.length) {
+      if (!validateComponentDepth(comp.subcomponents, currentDepth + 1)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 /**
@@ -113,6 +138,16 @@ const processConfigInputSchema = z
       return true;
     },
     { message: "Invalid config structure" }
+  )
+  .refine(
+    (data) => {
+      // Validate component nesting depth (max 3 levels)
+      if (data.components?.length) {
+        return validateComponentDepth(data.components);
+      }
+      return true;
+    },
+    { message: `Components cannot be nested more than ${MAX_COMPONENT_DEPTH} levels deep` }
   );
 
 /**

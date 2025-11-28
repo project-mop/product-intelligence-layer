@@ -854,7 +854,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 });
 
 describe("GET /api/v1/intelligence/:processId/schema", () => {
-  describe("Authentication", () => {
+  describe("Authentication (AC: 7)", () => {
     it("should return 401 for missing Authorization header", async () => {
       const { process } = await processFactory.createWithTenant();
 
@@ -870,6 +870,188 @@ describe("GET /api/v1/intelligence/:processId/schema", () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error.code).toBe("UNAUTHORIZED");
+    });
+
+    it("should return 401 for invalid Bearer token format", async () => {
+      const { process } = await processFactory.createWithTenant();
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: "InvalidToken",
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(401);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("UNAUTHORIZED");
+    });
+
+    it("should return 401 for non-existent API key", async () => {
+      const { process } = await processFactory.createWithTenant();
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: "Bearer pil_live_nonexistentkey123456789012345678901234567890123456",
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(401);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("UNAUTHORIZED");
+    });
+  });
+
+  describe("Authorization (AC: 7)", () => {
+    it("should return 403 for API key without process scope", async () => {
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      // Create API key without process scope
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: [], // No scopes
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(403);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("FORBIDDEN");
+    });
+
+    it("should return 403 for API key scoped to different process", async () => {
+      const tenant = await tenantFactory.create();
+      const process1 = await processFactory.create({ tenantId: tenant.id });
+      const process2 = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process1.id,
+        environment: "PRODUCTION",
+      });
+
+      // Create API key scoped only to process2
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: [`process:${process2.id}`],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process1.id}/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams(process1.id));
+
+      expect(response.status).toBe(403);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("FORBIDDEN");
+    });
+  });
+
+  describe("Process Lookup (AC: 7)", () => {
+    it("should return 404 for non-existent processId", async () => {
+      const tenant = await tenantFactory.create();
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/proc_nonexistent123456/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams("proc_nonexistent123456"));
+
+      expect(response.status).toBe(404);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("NOT_FOUND");
+    });
+
+    it("should return 404 when accessing other tenant's process (tenant isolation)", async () => {
+      // Create tenant1 with process
+      const tenant1 = await tenantFactory.create({ name: "Tenant 1" });
+      const process = await processFactory.create({ tenantId: tenant1.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      // Create tenant2 with API key
+      const tenant2 = await tenantFactory.create({ name: "Tenant 2" });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant2.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      // Try to access tenant1's process with tenant2's key
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/schema`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+        }
+      );
+
+      const response = await schemaHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(404);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("NOT_FOUND");
     });
   });
 

@@ -63,7 +63,7 @@ development_status:
   3-2-llm-gateway-integration: done
   3-3-in-browser-endpoint-testing: done
   3-4-intelligence-list-dashboard: done
-  3-5-view-json-schema: backlog
+  3-5-view-json-schema: done
   3-6-auto-generated-api-documentation: backlog
   # Note: Story 3.7 (Export API Results) moved to Epic 6 as Story 6.6
   epic-3-retrospective: optional

@@ -1,0 +1,319 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>5</storyId>
+    <title>View JSON Schema</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-5-view-json-schema.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer integrating the API</asA>
+    <iWant>to view the JSON schema for any intelligence</iWant>
+    <soThat>I can understand the expected input and output formats for my integration</soThat>
+    <tasks>
+      <task id="1" ac="7">Create Schema API Endpoint
+        <subtask>Create src/app/api/v1/intelligence/[processId]/schema/route.ts</subtask>
+        <subtask>Implement GET handler with Bearer token authentication</subtask>
+        <subtask>Validate API key using validateApiKey from auth service</subtask>
+        <subtask>Assert process access using assertProcessAccess</subtask>
+        <subtask>Load ProcessVersion by processId, tenantId, and environment from API key</subtask>
+        <subtask>Return response shape: { success: true, data: { processId, name, version, inputSchema, outputSchema } }</subtask>
+        <subtask>Handle 401 (unauthorized), 403 (forbidden), 404 (not found) errors</subtask>
+        <subtask>Add request ID tracking in response headers</subtask>
+        <status>ALREADY IMPLEMENTED - schema endpoint exists at src/app/api/v1/intelligence/[processId]/schema/route.ts</status>
+      </task>
+      <task id="2" ac="2,3,6">Create SchemaViewer Component
+        <subtask>Create src/components/process/SchemaViewer.tsx</subtask>
+        <subtask>Props: { schema: object, title: string, onCopy: () => void, onDownload: () => void }</subtask>
+        <subtask>Use react-syntax-highlighter for JSON syntax highlighting (already installed from Story 3.3)</subtask>
+        <subtask>Display schema with proper indentation (2 spaces)</subtask>
+        <subtask>Show field descriptions as tooltips or inline annotations if present</subtask>
+        <subtask>Use shadcn/ui Card component as container</subtask>
+        <subtask>Add collapsible sections for nested objects</subtask>
+      </task>
+      <task id="3" ac="4,5">Create Schema Action Buttons
+        <subtask>Add copy button with clipboard icon using shadcn/ui Button</subtask>
+        <subtask>Implement copy to clipboard using navigator.clipboard.writeText</subtask>
+        <subtask>Show toast notification on successful copy (reuse from Story 3.3)</subtask>
+        <subtask>Add download button with download icon</subtask>
+        <subtask>Implement download as JSON file with filename format: {process-name}-{input|output}-schema.json</subtask>
+        <subtask>Use URL.createObjectURL and a download pattern for file download</subtask>
+      </task>
+      <task id="4" ac="1,2,3">Create Schema Page/Tab
+        <subtask>Add Schema tab/section to process detail page at src/app/(dashboard)/processes/[id]/page.tsx</subtask>
+        <subtask>Or create dedicated schema page at src/app/(dashboard)/processes/[id]/schema/page.tsx</subtask>
+        <subtask>Layout: Side-by-side panels for input (left) and output (right) schemas on desktop</subtask>
+        <subtask>Responsive: Stack vertically on mobile</subtask>
+        <subtask>Add navigation link from process detail page (e.g., "View Schema" button or tab)</subtask>
+        <subtask>Load process data via tRPC process.get procedure</subtask>
+      </task>
+      <task id="5" ac="1,2,3">Add tRPC Procedure for Dashboard Schema Access
+        <subtask>Add process.getSchemas query to process router (or reuse process.get if it returns schemas)</subtask>
+        <subtask>Return { inputSchema, outputSchema, inputSchemaDescription, outputSchemaDescription }</subtask>
+        <subtask>Ensure tenant isolation via session context</subtask>
+        <status>PARTIAL - process.get already returns inputSchema and outputSchema</status>
+      </task>
+      <task id="6" ac="2,3,4,5">Write Unit Tests
+        <subtask>Test SchemaViewer renders JSON with syntax highlighting</subtask>
+        <subtask>Test copy button calls clipboard API with correct content</subtask>
+        <subtask>Test download button triggers file download with correct filename</subtask>
+        <subtask>Test field descriptions display when present in schema</subtask>
+        <subtask>Test responsive layout behavior</subtask>
+      </task>
+      <task id="7" ac="7">Write Integration Tests
+        <subtask>Test /api/v1/intelligence/:processId/schema returns correct schema structure</subtask>
+        <subtask>Test endpoint returns 401 for missing/invalid API key</subtask>
+        <subtask>Test endpoint returns 403 for API key without process scope</subtask>
+        <subtask>Test endpoint returns 404 for non-existent process</subtask>
+        <subtask>Test tenant isolation (cannot access other tenant's schemas)</subtask>
+        <subtask>Test schema includes all fields from ProcessVersion config</subtask>
+      </task>
+      <task id="8" ac="1,2,3,4,5">Write Component Tests
+        <subtask>Test Schema page/tab renders both input and output schemas</subtask>
+        <subtask>Test navigation to schema view from process detail</subtask>
+        <subtask>Test copy and download functionality in component context</subtask>
+      </task>
+      <task id="9" ac="1-7">Verification
+        <subtask>Run pnpm typecheck - zero errors</subtask>
+        <subtask>Run pnpm lint - zero new errors</subtask>
+        <subtask>Run pnpm test:unit - all tests pass</subtask>
+        <subtask>Run pnpm test:integration - all tests pass</subtask>
+        <subtask>Run pnpm build - production build succeeds</subtask>
+        <subtask>Manual verification of schema viewer flow</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Schema Viewer Access: Schema viewer is accessible from the process detail page (/dashboard/processes/:id)</criterion>
+    <criterion id="2">Input Schema Display: Displays input schema with formatted JSON and syntax highlighting</criterion>
+    <criterion id="3">Output Schema Display: Displays output schema with formatted JSON and syntax highlighting</criterion>
+    <criterion id="4">Copy Functionality: One-click copy button for each schema (input and output separately)</criterion>
+    <criterion id="5">Download Option: Download each schema as a .json file with descriptive filename</criterion>
+    <criterion id="6">Field Descriptions: Schema display includes field descriptions from the process definition</criterion>
+    <criterion id="7">REST API Endpoint: Public REST endpoint at /api/v1/intelligence/:processId/schema returns both schemas - ALREADY IMPLEMENTED</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: API Generation and Endpoints</title>
+        <section>Story 3.5: View JSON Schema (lines 449-457)</section>
+        <snippet>Defines acceptance criteria: schema viewer accessible from process detail, input/output schema display with syntax highlighting, copy and download buttons, field descriptions, REST endpoint for schema retrieval.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Public API Patterns, Permission Checking Patterns</section>
+        <snippet>Defines REST API patterns for public endpoints, Bearer token authentication via API keys, tenant isolation via API key's tenantId, scope validation for process access (process:* or process:proc_id).</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Types Overview, Component Tests</section>
+        <snippet>Unit tests in tests/unit/, integration tests in tests/integration/, component tests use renderWithProviders. 90% coverage threshold. routers tested via integration, components via Vitest+RTL.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Definitions</title>
+        <section>Epic 3: API Generation and Endpoints</section>
+        <snippet>Story 3.5 View JSON Schema - provides developers ability to view, copy, download JSON schemas for intelligences, essential for API integration.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/app/api/v1/intelligence/[processId]/schema/route.ts</path>
+        <kind>REST endpoint</kind>
+        <symbol>GET handler</symbol>
+        <lines>1-122</lines>
+        <reason>ALREADY IMPLEMENTED - REST API endpoint for schema retrieval. AC 7 is complete. Implements Bearer token auth, process access validation, tenant isolation, returns inputSchema and outputSchema.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>tRPC router</kind>
+        <symbol>processRouter.get</symbol>
+        <lines>378-417</lines>
+        <reason>Existing process.get query returns process with inputSchema and outputSchema. Can be reused for dashboard schema viewing. Returns versionCount and hasProductionVersion.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/auth/api-key-validator.ts</path>
+        <kind>service</kind>
+        <symbol>validateApiKey, assertProcessAccess</symbol>
+        <lines>1-227</lines>
+        <reason>API key validation service used by REST endpoint. Validates Bearer token, checks revocation/expiration, returns ApiKeyContext with tenantId, scopes, environment.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/auth/api-key.ts</path>
+        <kind>service</kind>
+        <symbol>hashKey, generateKey</symbol>
+        <lines>1-276</lines>
+        <reason>API key generation and hashing utilities. Used by api-key-validator for hash comparison.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/process/TestConsole.tsx</path>
+        <kind>component</kind>
+        <symbol>TestConsole</symbol>
+        <lines>full</lines>
+        <reason>Existing component with syntax highlighting pattern from Story 3.3. Uses react-syntax-highlighter. Has copy/toast patterns to reuse for SchemaViewer.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/card.tsx</path>
+        <kind>component</kind>
+        <symbol>Card, CardHeader, CardContent</symbol>
+        <lines>full</lines>
+        <reason>shadcn/ui Card component for schema viewer container. Already installed and used throughout dashboard.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>full</lines>
+        <reason>shadcn/ui Button component for copy and download buttons. Already installed.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/tooltip.tsx</path>
+        <kind>component</kind>
+        <symbol>Tooltip, TooltipTrigger, TooltipContent</symbol>
+        <lines>full</lines>
+        <reason>shadcn/ui Tooltip for field descriptions. Already installed.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/sonner.tsx</path>
+        <kind>component</kind>
+        <symbol>Toaster</symbol>
+        <lines>full</lines>
+        <reason>Toast notifications via sonner. Use for copy feedback (already established pattern from 3.3).</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process.factory.ts</path>
+        <kind>test factory</kind>
+        <symbol>processFactory</symbol>
+        <lines>full</lines>
+        <reason>Process factory for integration tests. Use createWithTenant for test data with inputSchema/outputSchema.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process-version.factory.ts</path>
+        <kind>test factory</kind>
+        <symbol>processVersionFactory</symbol>
+        <lines>full</lines>
+        <reason>ProcessVersion factory for creating published versions in tests. createProduction, createWithProcess methods available.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/api-key.factory.ts</path>
+        <kind>test factory</kind>
+        <symbol>apiKeyFactory</symbol>
+        <lines>full</lines>
+        <reason>API key factory for integration tests. createForTenant method for creating test API keys with scopes.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react-syntax-highlighter" version="^16.1.0">Syntax highlighting for JSON display - ALREADY INSTALLED</package>
+        <package name="@types/react-syntax-highlighter" version="^15.5.13">TypeScript types - ALREADY INSTALLED</package>
+        <package name="sonner" version="^2.0.7">Toast notifications - ALREADY INSTALLED</package>
+        <package name="lucide-react" version="^0.555.0">Icons (Copy, Download) - ALREADY INSTALLED</package>
+        <package name="next" version="^15.2.3">Next.js framework</package>
+        <package name="@trpc/server" version="^11.0.0">tRPC for dashboard API</package>
+        <package name="@trpc/react-query" version="^11.0.0">tRPC React hooks</package>
+        <package name="zod" version="^3.24.2">Schema validation</package>
+        <package name="vitest" version="^4.0.14">Unit/integration testing</package>
+        <package name="@testing-library/react" version="^16.3.0">Component testing</package>
+        <package name="@playwright/test" version="^1.57.0">E2E testing</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="Dev Notes">BEFORE WRITING TESTS: Review testing strategy at /docs/testing-strategy-mvp.md</constraint>
+    <constraint source="Dev Notes">Unit tests for SchemaViewer component, copy/download utilities</constraint>
+    <constraint source="Dev Notes">Integration tests for REST API endpoint with real database</constraint>
+    <constraint source="Dev Notes">50% coverage minimum for MVP</constraint>
+    <constraint source="architecture.md">REST for public API endpoints (ADR-003), tRPC for dashboard</constraint>
+    <constraint source="architecture.md">All database queries MUST filter by tenantId for tenant isolation</constraint>
+    <constraint source="architecture.md">API key scopes use format: process:* or process:proc_id</constraint>
+    <constraint source="architecture.md">Use protectedProcedure for tRPC dashboard queries</constraint>
+    <constraint source="Story 3.4 learnings">Use shadcn/ui components consistently (Card, Badge, Button)</constraint>
+    <constraint source="Story 3.4 learnings">Toast notifications pattern via sonner for copy feedback</constraint>
+    <constraint source="Story 3.3 learnings">react-syntax-highlighter already installed and configured</constraint>
+    <constraint source="tech-spec-epic-3">Schema display layout: side-by-side on desktop, stacked on mobile</constraint>
+    <constraint source="tech-spec-epic-3">Download filename format: {process-name}-{input|output}-schema.json</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /api/v1/intelligence/:processId/schema" kind="REST endpoint" path="src/app/api/v1/intelligence/[processId]/schema/route.ts">
+      <signature>GET /api/v1/intelligence/:processId/schema
+Authorization: Bearer pil_live_xxx or pil_test_xxx
+
+Response (200):
+{
+  "success": true,
+  "data": {
+    "processId": "proc_abc123",
+    "name": "Process Name",
+    "version": "1.0.0",
+    "inputSchema": { ... },
+    "outputSchema": { ... }
+  }
+}
+
+Error Responses: 401 (unauthorized), 403 (forbidden), 404 (not found)</signature>
+    </interface>
+    <interface name="process.get" kind="tRPC query" path="src/server/api/routers/process.ts:378-417">
+      <signature>process.get({ id: string }): Promise&lt;{
+  id: string;
+  name: string;
+  description: string | null;
+  inputSchema: JsonValue;
+  outputSchema: JsonValue;
+  tenantId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+  versions: ProcessVersion[];
+  versionCount: number;
+  hasProductionVersion: boolean;
+}&gt;</signature>
+    </interface>
+    <interface name="validateApiKey" kind="function" path="src/server/services/auth/api-key-validator.ts:67-179">
+      <signature>validateApiKey(authHeader: string | null): Promise&lt;ApiKeyValidationResult&gt;
+where ApiKeyValidationResult =
+  | { valid: true; context: ApiKeyContext }
+  | { valid: false; error: ApiKeyValidationError }</signature>
+    </interface>
+    <interface name="assertProcessAccess" kind="function" path="src/server/services/auth/api-key-validator.ts:190-202">
+      <signature>assertProcessAccess(ctx: ApiKeyContext, processId: string): void
+Throws Error if API key lacks process:* or process:{processId} scope</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Tests use Vitest for unit and integration tests, Playwright for E2E. Unit tests mock external dependencies. Integration tests use real PostgreSQL database with automatic cleanup via testDb utilities. Component tests use renderWithProviders and createMockSession from tests/support/render.tsx. Coverage thresholds: 90% lines, 70% functions, 90% branches, 90% statements. Routers are covered by integration tests, not unit tests.</standards>
+    <locations>
+      <location>tests/unit/ - Unit tests including tests/unit/components/ for component tests</location>
+      <location>tests/integration/ - Integration tests with real database</location>
+      <location>tests/e2e/ - Playwright E2E tests</location>
+      <location>tests/support/factories/ - Test data factories</location>
+      <location>tests/support/db.ts - Test database utilities</location>
+      <location>tests/support/trpc.ts - tRPC test callers</location>
+      <location>tests/support/render.tsx - React render utilities</location>
+    </locations>
+    <ideas>
+      <idea ac="2,3">Test SchemaViewer component renders formatted JSON with syntax highlighting using react-syntax-highlighter</idea>
+      <idea ac="4">Test copy button calls navigator.clipboard.writeText with stringified schema JSON</idea>
+      <idea ac="4">Test copy button shows toast notification on success</idea>
+      <idea ac="5">Test download button creates blob URL and triggers download with correct filename format</idea>
+      <idea ac="6">Test field descriptions from JSON Schema "description" property render as tooltips</idea>
+      <idea ac="1">Test schema page/tab navigation from process detail page</idea>
+      <idea ac="7">Integration test: GET /api/v1/intelligence/:processId/schema returns 200 with correct structure</idea>
+      <idea ac="7">Integration test: schema endpoint returns 401 for invalid Bearer token</idea>
+      <idea ac="7">Integration test: schema endpoint returns 403 for API key without process scope</idea>
+      <idea ac="7">Integration test: schema endpoint returns 404 for non-existent process</idea>
+      <idea ac="7">Integration test: schema endpoint enforces tenant isolation</idea>
+      <idea ac="2,3">Test responsive layout - side-by-side on desktop, stacked on mobile</idea>
+    </ideas>
+  </tests>
+</story-context>

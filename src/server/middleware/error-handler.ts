@@ -66,7 +66,8 @@ export function formatErrorResponse(
           : ErrorCode.LLM_ERROR;
 
     const statusCode = ERROR_HTTP_STATUS[code];
-    const retryAfter = DEFAULT_RETRY_AFTER;
+    // Use error's retryAfter if provided (e.g., from circuit breaker), else default
+    const retryAfter = error.retryAfter ?? DEFAULT_RETRY_AFTER;
 
     return {
       body: {

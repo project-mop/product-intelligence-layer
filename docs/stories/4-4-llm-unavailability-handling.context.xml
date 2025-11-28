@@ -1,0 +1,273 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4</storyId>
+    <title>LLM Unavailability Handling</title>
+    <status>draft</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-4-llm-unavailability-handling.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system</asA>
+    <iWant>to gracefully handle LLM provider unavailability with circuit breaker protection</iWant>
+    <soThat>consumers receive clear errors, can retry appropriately, and the system degrades gracefully during outages</soThat>
+    <tasks>
+      <task id="1" title="Create Circuit Breaker Service" ac="4, 5, 7, 8">
+        <subtask>Create `src/server/services/llm/circuit-breaker.ts`</subtask>
+        <subtask>Implement `CircuitBreaker` class with states: CLOSED, OPEN, HALF_OPEN</subtask>
+        <subtask>Track consecutive failures per provider</subtask>
+        <subtask>Configuration: CIRCUIT_BREAKER_THRESHOLD (default: 5), CIRCUIT_BREAKER_TIMEOUT_MS (default: 30000ms)</subtask>
+        <subtask>Methods: canRequest(), recordSuccess(), recordFailure(), getState(), getRetryAfterSeconds()</subtask>
+        <subtask>Half-open logic: After timeout, allow 1 probe request</subtask>
+      </task>
+      <task id="2" title="Add Circuit Breaker State Logging" ac="9">
+        <subtask>Log circuit state transitions with structured logging</subtask>
+        <subtask>Log when circuit OPENS (warn level)</subtask>
+        <subtask>Log when circuit CLOSES (info level)</subtask>
+        <subtask>Log when circuit enters HALF_OPEN (info level)</subtask>
+        <subtask>Include failure count in all state change logs</subtask>
+      </task>
+      <task id="3" title="Integrate Circuit Breaker with LLM Gateway" ac="1, 4, 6">
+        <subtask>Update `src/server/services/llm/anthropic.ts` to accept optional CircuitBreaker instance</subtask>
+        <subtask>Check circuitBreaker.canRequest() before making API call</subtask>
+        <subtask>Call recordSuccess() on successful response</subtask>
+        <subtask>Call recordFailure() on LLMError</subtask>
+        <subtask>If circuit is open, immediately throw LLMError with LLM_ERROR code</subtask>
+      </task>
+      <task id="4" title="Update LLM Error Response Format" ac="2, 3, 10">
+        <subtask>Verify error-handler.ts handles LLMError correctly</subtask>
+        <subtask>Update LLMError to include circuit breaker state info when applicable</subtask>
+        <subtask>Ensure retry_after value comes from circuit breaker or default (30s)</subtask>
+        <subtask>Test Retry-After header is set for all 503 responses</subtask>
+      </task>
+      <task id="5" title="Create Circuit Breaker Provider Registry" ac="4">
+        <subtask>Update `src/server/services/llm/index.ts` export structure</subtask>
+        <subtask>Export singleton circuit breaker for Anthropic</subtask>
+        <subtask>Export factory function createLLMGateway() with circuit breaker integration</subtask>
+        <subtask>Support future multi-provider scenario (one circuit per provider)</subtask>
+      </task>
+      <task id="6" title="Write Unit Tests for Circuit Breaker" ac="4-10">
+        <subtask>Create `tests/unit/server/services/llm/circuit-breaker.test.ts`</subtask>
+        <subtask>Test CLOSED state allows all requests</subtask>
+        <subtask>Test failure count increments correctly</subtask>
+        <subtask>Test circuit OPENS after threshold failures</subtask>
+        <subtask>Test OPEN state rejects all requests immediately</subtask>
+        <subtask>Test circuit enters HALF_OPEN after timeout</subtask>
+        <subtask>Test successful probe in HALF_OPEN closes circuit</subtask>
+        <subtask>Test failed probe in HALF_OPEN re-opens circuit</subtask>
+        <subtask>Test getRetryAfterSeconds() returns correct values</subtask>
+        <subtask>Test state change logging is called correctly</subtask>
+        <subtask>Mock time/clock for deterministic timeout testing</subtask>
+      </task>
+      <task id="7" title="Write Unit Tests for Gateway Integration" ac="1, 2, 3, 6">
+        <subtask>Update `tests/unit/server/services/llm/anthropic.test.ts`</subtask>
+        <subtask>Test gateway uses circuit breaker when provided</subtask>
+        <subtask>Test gateway throws immediately when circuit is open</subtask>
+        <subtask>Test gateway records success on successful response</subtask>
+        <subtask>Test gateway records failure on LLMError</subtask>
+        <subtask>Test timeout error includes retry_after</subtask>
+        <subtask>Test API error includes retry_after</subtask>
+      </task>
+      <task id="8" title="Write Integration Tests" ac="1-10">
+        <subtask>Update `tests/integration/intelligence-api.test.ts`</subtask>
+        <subtask>Add "Story 4.4: LLM Unavailability Handling" describe block</subtask>
+        <subtask>Test 503 LLM_TIMEOUT response format (mock timeout)</subtask>
+        <subtask>Test 503 LLM_ERROR response format (mock API error)</subtask>
+        <subtask>Test Retry-After header is present on 503 responses</subtask>
+        <subtask>Test retry_after field is in response body</subtask>
+        <subtask>Test multiple failures trigger circuit breaker</subtask>
+        <subtask>Test circuit breaker returns 503 immediately when open</subtask>
+      </task>
+      <task id="9" title="Verification" ac="1-10">
+        <subtask>Run `pnpm typecheck` - zero errors</subtask>
+        <subtask>Run `pnpm lint` - zero new errors</subtask>
+        <subtask>Run `pnpm test:unit` - all tests pass</subtask>
+        <subtask>Run `pnpm test:integration` - all tests pass</subtask>
+        <subtask>Run `pnpm build` - production build succeeds</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">LLM calls have configurable timeout (default 30 seconds, via `LLM_TIMEOUT_MS`)</criterion>
+    <criterion id="2">Timeout returns 503 with `code: "LLM_TIMEOUT"` and `retry_after: 30`</criterion>
+    <criterion id="3">Anthropic API errors return 503 with `code: "LLM_ERROR"` and appropriate `retry_after`</criterion>
+    <criterion id="4">Circuit breaker tracks consecutive LLM failures per provider</criterion>
+    <criterion id="5">After 5 consecutive failures, circuit opens for 30 seconds</criterion>
+    <criterion id="6">While circuit is open, requests fail fast with 503 (no LLM call attempted)</criterion>
+    <criterion id="7">After timeout, circuit enters half-open state allowing 1 probe request</criterion>
+    <criterion id="8">Successful probe closes circuit; failed probe re-opens it</criterion>
+    <criterion id="9">Circuit breaker state changes are logged for monitoring</criterion>
+    <criterion id="10">`Retry-After` header reflects circuit breaker state when applicable</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Story 4.4: LLM Unavailability Handling</section>
+        <snippet>Defines circuit breaker pattern with CLOSED/OPEN/HALF_OPEN states, 5 failure threshold, 30s timeout. Details integration with LLM gateway and error response format.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Intelligence Generation Flow, Error Handling Matrix</section>
+        <snippet>Documents the provider-agnostic LLM gateway interface and error handling patterns. Maps LLM_TIMEOUT and LLM_ERROR to 503 status codes.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Test Types Overview, Test Patterns</section>
+        <snippet>Unit tests for circuit breaker state machine logic; integration tests for API endpoint error responses. Use Vitest with mock time for deterministic timeout testing.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-3-error-response-contract.md</path>
+        <title>Story 4.3: Error Response Contract</title>
+        <section>Dev Notes, Technical Context</section>
+        <snippet>Established error handler middleware in src/server/middleware/error-handler.ts. LLMError mapping to 503 responses with Retry-After header already implemented.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/server/services/llm/types.ts</path>
+        <kind>types</kind>
+        <symbol>LLMGateway, LLMError, LLMErrorCode</symbol>
+        <lines>1-87</lines>
+        <reason>Core LLM interface and error types. LLMError class will be extended or used by circuit breaker.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/llm/anthropic.ts</path>
+        <kind>service</kind>
+        <symbol>AnthropicGateway</symbol>
+        <lines>1-195</lines>
+        <reason>Primary LLM gateway implementation. Needs modification to integrate circuit breaker. Already handles timeout and error mapping.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/llm/index.ts</path>
+        <kind>module</kind>
+        <symbol>exports</symbol>
+        <lines>1-11</lines>
+        <reason>Module exports for LLM services. Will need to export circuit breaker singleton and factory function.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/middleware/error-handler.ts</path>
+        <kind>middleware</kind>
+        <symbol>handleApiError, formatErrorResponse, createApiError</symbol>
+        <lines>1-228</lines>
+        <reason>Centralized error handler. Already handles LLMError to 503 mapping with Retry-After. May need update for dynamic retry_after from circuit breaker state.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/errors.ts</path>
+        <kind>utility</kind>
+        <symbol>ApiError, ErrorCode, ERROR_HTTP_STATUS</symbol>
+        <reason>Error types and HTTP status mappings. Contains LLM_TIMEOUT and LLM_ERROR codes mapping to 503.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/intelligence-api.test.ts</path>
+        <kind>test</kind>
+        <symbol>describe blocks for API testing</symbol>
+        <reason>Existing integration tests. Add Story 4.4 describe block for circuit breaker and LLM error tests.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>@anthropic-ai/sdk</package>
+        <version>^0.71.0</version>
+        <purpose>Anthropic Claude API client - already installed</purpose>
+      </node>
+      <package>vitest</package>
+      <package>zod</package>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">In-memory circuit breaker state (sufficient for MVP single-instance deployment)</constraint>
+    <constraint type="architecture">Per-provider circuit breakers (supports future multi-provider scenario)</constraint>
+    <constraint type="architecture">Conservative threshold (5 failures) to avoid premature circuit opening</constraint>
+    <constraint type="architecture">30-second open timeout aligns with Anthropic's typical rate limit recovery</constraint>
+    <constraint type="pattern">Circuit breaker shared across all gateway instances for same provider</constraint>
+    <constraint type="error">Error messages must be user-friendly; no internal details exposed</constraint>
+    <constraint type="header">Retry-After header REQUIRED for 503 responses</constraint>
+    <constraint type="logging">Structured logging for circuit state transitions</constraint>
+    <constraint type="env">LLM_TIMEOUT_MS already exists (default 30000ms)</constraint>
+    <constraint type="env">New env vars: CIRCUIT_BREAKER_THRESHOLD (default 5), CIRCUIT_BREAKER_TIMEOUT_MS (default 30000)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CircuitBreaker</name>
+      <kind>class interface</kind>
+      <signature>
+class CircuitBreaker {
+  canRequest(): boolean;
+  recordSuccess(): void;
+  recordFailure(): void;
+  getState(): CircuitState;
+  getRetryAfterSeconds(): number | null;
+}
+type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
+      </signature>
+      <path>src/server/services/llm/circuit-breaker.ts (TO CREATE)</path>
+    </interface>
+    <interface>
+      <name>LLMGateway</name>
+      <kind>interface</kind>
+      <signature>
+interface LLMGateway {
+  generate(params: GenerateParams): Promise&lt;GenerateResult&gt;;
+}
+      </signature>
+      <path>src/server/services/llm/types.ts</path>
+    </interface>
+    <interface>
+      <name>LLMError</name>
+      <kind>class</kind>
+      <signature>
+class LLMError extends Error {
+  constructor(
+    public readonly code: LLMErrorCode,
+    message: string,
+    public readonly cause?: Error
+  );
+}
+      </signature>
+      <path>src/server/services/llm/types.ts</path>
+    </interface>
+    <interface>
+      <name>AnthropicGatewayConfig</name>
+      <kind>interface</kind>
+      <signature>
+interface AnthropicGatewayConfig {
+  apiKey?: string;
+  defaultModel?: string;
+  timeoutMs?: number;
+  circuitBreaker?: CircuitBreaker; // TO ADD
+}
+      </signature>
+      <path>src/server/services/llm/anthropic.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Unit tests use Vitest with vi.useFakeTimers() for deterministic timeout testing. Integration tests use real database with factory-created test data. Mock the Anthropic SDK to simulate timeout/error scenarios. Circuit breaker state machine should be tested in isolation. Coverage threshold: 90% lines. Follow AAA pattern (Arrange-Act-Assert).
+    </standards>
+    <locations>
+      <location>tests/unit/server/services/llm/circuit-breaker.test.ts</location>
+      <location>tests/unit/server/services/llm/anthropic.test.ts</location>
+      <location>tests/integration/intelligence-api.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="4, 5">Test circuit transitions from CLOSED to OPEN after 5 consecutive failures</idea>
+      <idea ac="7, 8">Test half-open state: single probe request allowed, success closes circuit, failure re-opens</idea>
+      <idea ac="6">Test fail-fast behavior: when circuit is OPEN, requests should fail immediately without calling LLM</idea>
+      <idea ac="9">Test structured logging is called on state transitions with correct payload</idea>
+      <idea ac="10">Test Retry-After header reflects remaining circuit open time</idea>
+      <idea ac="1, 2, 3">Test LLM_TIMEOUT and LLM_ERROR responses include retry_after in body and Retry-After header</idea>
+      <idea ac="4">Test circuit breaker tracks failures per provider (singleton pattern)</idea>
+    </ideas>
+  </tests>
+</story-context>

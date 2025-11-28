@@ -79,7 +79,9 @@ export class LLMError extends Error {
   constructor(
     public readonly code: LLMErrorCode,
     message: string,
-    public readonly cause?: Error
+    public readonly cause?: Error,
+    /** Optional retry-after value in seconds (e.g., from circuit breaker) */
+    public readonly retryAfter?: number
   ) {
     super(message);
     this.name = "LLMError";

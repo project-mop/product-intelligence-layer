@@ -10,6 +10,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { GenerateParams, GenerateResult, LLMGateway } from "./types";
 import { LLMError } from "./types";
+import type { CircuitBreaker } from "./circuit-breaker";
 
 /** Default model for Anthropic (cost-effective for most use cases) */
 const DEFAULT_MODEL = "claude-3-haiku-20240307";
@@ -29,6 +30,9 @@ export interface AnthropicGatewayConfig {
 
   /** Request timeout in milliseconds (defaults to 30000) */
   timeoutMs?: number;
+
+  /** Optional circuit breaker for fail-fast behavior during outages */
+  circuitBreaker?: CircuitBreaker;
 }
 
 /**
@@ -44,6 +48,7 @@ export class AnthropicGateway implements LLMGateway {
   private readonly client: Anthropic;
   private readonly defaultModel: string;
   private readonly timeoutMs: number;
+  private readonly circuitBreaker?: CircuitBreaker;
 
   constructor(config: AnthropicGatewayConfig = {}) {
     const apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -69,6 +74,8 @@ export class AnthropicGateway implements LLMGateway {
       (process.env.LLM_TIMEOUT_MS
         ? parseInt(process.env.LLM_TIMEOUT_MS, 10)
         : DEFAULT_TIMEOUT_MS);
+
+    this.circuitBreaker = config.circuitBreaker;
   }
 
   /**
@@ -78,9 +85,20 @@ export class AnthropicGateway implements LLMGateway {
    * @returns Generated result with text and metadata
    * @throws LLMError with code LLM_TIMEOUT on timeout
    * @throws LLMError with code LLM_RATE_LIMITED on 429
-   * @throws LLMError with code LLM_ERROR on other API errors
+   * @throws LLMError with code LLM_ERROR on other API errors or circuit open
    */
   async generate(params: GenerateParams): Promise<GenerateResult> {
+    // Check circuit breaker before making request
+    if (this.circuitBreaker && !this.circuitBreaker.canRequest()) {
+      const retryAfter = this.circuitBreaker.getRetryAfterSeconds() ?? 30;
+      throw new LLMError(
+        "LLM_ERROR",
+        `Service temporarily unavailable. Retry after ${retryAfter} seconds.`,
+        undefined,
+        retryAfter
+      );
+    }
+
     const startTime = Date.now();
     const model = params.model ?? this.defaultModel;
 
@@ -101,6 +119,9 @@ export class AnthropicGateway implements LLMGateway {
         .map((block) => block.text)
         .join("");
 
+      // Record success with circuit breaker
+      this.circuitBreaker?.recordSuccess();
+
       return {
         text,
         usage: {
@@ -112,7 +133,12 @@ export class AnthropicGateway implements LLMGateway {
       };
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      throw this.mapError(error, durationMs);
+      const llmError = this.mapError(error, durationMs);
+
+      // Record failure with circuit breaker
+      this.circuitBreaker?.recordFailure();
+
+      throw llmError;
     }
   }
 

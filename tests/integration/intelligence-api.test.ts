@@ -2629,3 +2629,335 @@ describe("Story 4.3: Error Response Contract", () => {
     });
   });
 });
+
+/**
+ * Story 4.4: LLM Unavailability Handling Tests
+ *
+ * Tests circuit breaker integration with the LLM gateway:
+ * - 503 responses include Retry-After header
+ * - retry_after field in response body
+ * - LLM_TIMEOUT and LLM_ERROR response formats
+ *
+ * Circuit breaker state machine is tested in unit tests.
+ * @see tests/unit/server/services/llm/circuit-breaker.test.ts
+ *
+ * @see docs/stories/4-4-llm-unavailability-handling.md
+ */
+describe("Story 4.4: LLM Unavailability Handling", () => {
+  /**
+   * Helper to create a mock gateway for testing.
+   */
+  function createMockGateway44(
+    handler: (params: GenerateParams) => Promise<GenerateResult> | GenerateResult
+  ): LLMGateway {
+    return {
+      generate: async (params: GenerateParams): Promise<GenerateResult> => {
+        return handler(params);
+      },
+    };
+  }
+
+  beforeEach(() => {
+    setGatewayOverride(null);
+  });
+
+  afterEach(() => {
+    setGatewayOverride(null);
+  });
+
+  describe("503 LLM_TIMEOUT Response Format (AC: 1, 2)", () => {
+    it("should return 503 with code LLM_TIMEOUT on timeout", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_TIMEOUT", "LLM request timed out after 30000ms");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "timeout test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("LLM_TIMEOUT");
+      expect(body.error.retry_after).toBe(30);
+    });
+
+    it("should include Retry-After header on 503 timeout response", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_TIMEOUT", "Request timed out");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "timeout header test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("30");
+    });
+  });
+
+  describe("503 LLM_ERROR Response Format (AC: 3)", () => {
+    it("should return 503 with code LLM_ERROR on API error", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_ERROR", "Anthropic API server error");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "api error test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("LLM_ERROR");
+      expect(body.error.retry_after).toBe(30);
+    });
+
+    it("should include Retry-After header on 503 error response", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_ERROR", "Service unavailable");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "error header test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("30");
+    });
+  });
+
+  describe("Dynamic Retry-After from Circuit Breaker (AC: 10)", () => {
+    it("should use custom retryAfter value when provided in LLMError", async () => {
+      // When circuit breaker is open, the gateway throws LLMError with custom retryAfter
+      const mockGateway = createMockGateway44(async () => {
+        // Simulate circuit breaker open - 25 seconds remaining
+        throw new LLMError(
+          "LLM_ERROR",
+          "Service temporarily unavailable. Retry after 25 seconds.",
+          undefined,
+          25 // Custom retry after from circuit breaker
+        );
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "circuit breaker test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(503);
+
+      // Should use the custom retryAfter value
+      expect(response.headers.get("Retry-After")).toBe("25");
+
+      const body = await response.json();
+      expect(body.error.retry_after).toBe(25);
+    });
+  });
+
+  describe("Response Body Format (AC: 2, 3)", () => {
+    it("should include retry_after in response body for LLM_TIMEOUT", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_TIMEOUT", "Timeout");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "body format test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+      const body = await response.json();
+
+      // Verify the exact response format per spec
+      expect(body).toMatchObject({
+        success: false,
+        error: {
+          code: "LLM_TIMEOUT",
+          message: expect.any(String),
+          retry_after: 30,
+        },
+      });
+    });
+
+    it("should include retry_after in response body for LLM_ERROR", async () => {
+      const mockGateway = createMockGateway44(async () => {
+        throw new LLMError("LLM_ERROR", "API Error");
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "error body format test" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+      const body = await response.json();
+
+      // Verify the exact response format per spec
+      expect(body).toMatchObject({
+        success: false,
+        error: {
+          code: "LLM_ERROR",
+          message: expect.any(String),
+          retry_after: 30,
+        },
+      });
+    });
+  });
+});

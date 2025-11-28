@@ -6,6 +6,7 @@
  *
  * @see docs/architecture.md#Error-Handling-Matrix
  * @see docs/stories/4-1-input-schema-validation.md
+ * @see docs/stories/4-3-error-response-contract.md
  */
 
 /**
@@ -36,12 +37,19 @@ export enum ErrorCode {
   OUTPUT_VALIDATION_FAILED = "OUTPUT_VALIDATION_FAILED",
   /** Invalid input data */
   INVALID_INPUT = "INVALID_INPUT",
-  /** Rate limit exceeded */
-  RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED",
+  /** Rate limit exceeded (Story 4.3) */
+  RATE_LIMITED = "RATE_LIMITED",
+  /** @deprecated Use RATE_LIMITED instead */
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  RATE_LIMIT_EXCEEDED = "RATE_LIMITED",
 }
 
 /**
  * HTTP status codes for each error code.
+ * @see docs/architecture.md#Error-Handling-Matrix
+ *
+ * Note: RATE_LIMIT_EXCEEDED maps to "RATE_LIMITED" (deprecated alias),
+ * so it uses the same key and doesn't need a separate entry.
  */
 export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   [ErrorCode.VALIDATION_ERROR]: 400,
@@ -54,9 +62,9 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   [ErrorCode.LLM_TIMEOUT]: 503,
   [ErrorCode.LLM_ERROR]: 503,
   [ErrorCode.OUTPUT_PARSE_FAILED]: 500,
-  [ErrorCode.OUTPUT_VALIDATION_FAILED]: 500, // Server error per AC #6
+  [ErrorCode.OUTPUT_VALIDATION_FAILED]: 500, // Server error per AC #7
   [ErrorCode.INVALID_INPUT]: 400,
-  [ErrorCode.RATE_LIMIT_EXCEEDED]: 429,
+  [ErrorCode.RATE_LIMITED]: 429,
 };
 
 /**
@@ -81,6 +89,8 @@ export interface ErrorDetails {
 
 /**
  * API error response format.
+ * @see docs/architecture.md#Error-Response-Format
+ * @see docs/stories/4-3-error-response-contract.md AC#1
  */
 export interface ApiErrorResponse {
   success: false;
@@ -88,6 +98,8 @@ export interface ApiErrorResponse {
     code: string;
     message: string;
     details?: ErrorDetails;
+    /** Seconds to wait before retrying (for 429/503 responses) */
+    retry_after?: number;
   };
 }
 
@@ -126,6 +138,7 @@ export class ApiError extends Error {
 
   /**
    * Convert to standard API error response format.
+   * @see docs/stories/4-3-error-response-contract.md AC#1
    */
   toResponse(): ApiErrorResponse {
     return {
@@ -134,6 +147,7 @@ export class ApiError extends Error {
         code: this.code,
         message: this.message,
         ...(this.details && { details: this.details }),
+        ...(this.retryAfter !== undefined && { retry_after: this.retryAfter }),
       },
     };
   }
@@ -160,4 +174,80 @@ export function createValidationError(issues: ValidationIssue[]): ApiError {
     ERROR_HTTP_STATUS[ErrorCode.VALIDATION_ERROR],
     { issues }
   );
+}
+
+/**
+ * Patterns to remove from error messages to prevent leaking internal details.
+ * @see docs/stories/4-3-error-response-contract.md AC#10
+ */
+const SANITIZE_PATTERNS = [
+  // Stack traces (at /path/to/file.ts:123:45)
+  /\s+at\s+.+:\d+:\d+\)?/g,
+  // File paths (/Users/foo/project/src/file.ts)
+  /(?:\/[\w.-]+)+\.(?:ts|js|tsx|jsx|mjs|cjs)/g,
+  // Windows paths (C:\Users\foo\project\src\file.ts)
+  /(?:[A-Za-z]:\\[\w\\.-]+)+\.(?:ts|js|tsx|jsx|mjs|cjs)/g,
+  // Node module paths (node_modules/.../file.js)
+  /node_modules[/\\][^\s]*/g,
+  // Node module references without path
+  /node_modules[:\s]*/g,
+  // Line/column numbers (e.g., :123:45 or :123)
+  /:\d+(:\d+)?/g,
+  // Unix file paths without extension
+  /\/[\w.-]+(?:\/[\w.-]+)+/g,
+  // Error: prefix followed by internal details
+  /Error:\s*at\s+/g,
+];
+
+/**
+ * Default user-friendly messages for internal errors.
+ */
+const GENERIC_ERROR_MESSAGES: Partial<Record<ErrorCode, string>> = {
+  [ErrorCode.INTERNAL_ERROR]: "An unexpected error occurred. Please try again.",
+  [ErrorCode.LLM_ERROR]: "Intelligence service temporarily unavailable. Please retry.",
+  [ErrorCode.LLM_TIMEOUT]: "Intelligence service timed out. Please retry.",
+};
+
+/**
+ * Sanitize error messages to remove stack traces, file paths, and internal details.
+ * Returns a user-friendly message safe for API responses.
+ *
+ * @param message - The original error message
+ * @param errorCode - Optional error code to provide a default message
+ * @returns Sanitized message safe for external exposure
+ *
+ * @example
+ * ```typescript
+ * sanitizeErrorMessage("Error at /Users/dev/src/api.ts:123:45");
+ * // Returns: "Error"
+ *
+ * sanitizeErrorMessage("Connection failed", ErrorCode.INTERNAL_ERROR);
+ * // Returns: "An unexpected error occurred. Please try again."
+ * ```
+ *
+ * @see docs/stories/4-3-error-response-contract.md AC#10
+ */
+export function sanitizeErrorMessage(
+  message: string,
+  errorCode?: ErrorCode
+): string {
+  // Check if message contains internal details
+  let sanitized = message;
+
+  for (const pattern of SANITIZE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+
+  // Trim and clean up extra whitespace
+  sanitized = sanitized.replace(/\s+/g, " ").trim();
+
+  // If message is empty or only contains generic error prefix, use default
+  if (!sanitized || sanitized === "Error" || sanitized === "Error:") {
+    if (errorCode && GENERIC_ERROR_MESSAGES[errorCode]) {
+      return GENERIC_ERROR_MESSAGES[errorCode];
+    }
+    return "An unexpected error occurred";
+  }
+
+  return sanitized;
 }

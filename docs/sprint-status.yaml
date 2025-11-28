@@ -72,7 +72,7 @@ development_status:
   epic-4: contexted
   4-1-input-schema-validation: done
   4-2-output-schema-enforcement: done
-  4-3-error-response-contract: backlog
+  4-3-error-response-contract: done
   4-4-llm-unavailability-handling: backlog
   4-5-response-caching: backlog
   4-6-configurable-cache-ttl: backlog

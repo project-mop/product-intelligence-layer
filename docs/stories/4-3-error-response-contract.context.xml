@@ -1,0 +1,107 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>3</storyId>
+    <title>Error Response Contract</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-3-error-response-contract.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer consuming the API</asA>
+    <iWant>consistent, predictable error responses across all endpoints</iWant>
+    <soThat>I can handle errors programmatically and provide clear feedback to my users</soThat>
+    <tasks>
+      <task id="1" acs="1,10">Audit and Consolidate Error Response Helpers - Review errors.ts and response.ts, ensure standard format, add sanitizeErrorMessage(), add unit tests</task>
+      <task id="2" acs="2-8">Verify HTTP Status Code Mappings - Review ErrorCode enum, create errorCodeToStatusCode() mapping, add unit tests</task>
+      <task id="3" acs="6,8,9">Implement Retry-After Header Support - Update ApiError with retryAfter, create rateLimitedError/llmTimeoutError/llmError helpers</task>
+      <task id="4" acs="1,10">Create Centralized Error Handler Middleware - Create error-handler.ts with handleApiError() and formatErrorResponse()</task>
+      <task id="5" acs="1-10">Integrate Error Handler in Generate Endpoint - Update generate route.ts, wrap in try/catch, verify all error paths</task>
+      <task id="6" acs="1-10">Write Unit Tests for Error Contracts - Test ApiError.toResponse(), error code mapping, Retry-After, no stack traces</task>
+      <task id="7" acs="1-10">Write Integration Tests for Error Responses - Test all HTTP status codes and formats in intelligence-api.test.ts</task>
+      <task id="8" acs="1-10">Verification - Run typecheck, lint, test:unit, test:integration, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">All error responses follow standard format: { success: false, error: { code, message, details?, retry_after? } }</criterion>
+    <criterion id="2">HTTP 400 returned for client errors: VALIDATION_ERROR (input invalid)</criterion>
+    <criterion id="3">HTTP 401 returned for: UNAUTHORIZED (invalid/missing API key)</criterion>
+    <criterion id="4">HTTP 403 returned for: FORBIDDEN (key lacks scope for this process)</criterion>
+    <criterion id="5">HTTP 404 returned for: NOT_FOUND (process doesn't exist or not published)</criterion>
+    <criterion id="6">HTTP 429 returned for: RATE_LIMITED (quota exceeded) - with retry_after</criterion>
+    <criterion id="7">HTTP 500 returned for: OUTPUT_VALIDATION_FAILED (LLM output didn't match schema after retry)</criterion>
+    <criterion id="8">HTTP 503 returned for: LLM_TIMEOUT, LLM_ERROR (provider unavailable) - with retry_after</criterion>
+    <criterion id="9">All 429 and 503 responses include Retry-After HTTP header (seconds)</criterion>
+    <criterion id="10">Error messages are user-friendly; no stack traces or internal details exposed</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture" section="Error Handling Matrix" snippet="Maps error types to HTTP status codes: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 NOT_FOUND, 400 VALIDATION_ERROR, 429 RATE_LIMITED, 500 OUTPUT_VALIDATION_FAILED, 503 LLM_TIMEOUT/LLM_ERROR. Response format: { success, error: { code, message, details } }"/>
+      <doc path="docs/architecture.md" title="Architecture" section="Consistency Rules - Error Response Format" snippet="Standard error format: { success: false, error: { code, message, details } }. Success format includes meta with version, cached, latency_ms, request_id."/>
+      <doc path="docs/architecture.md" title="Architecture" section="Public API Patterns" snippet="Rate limit headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset. Request ID in all responses: X-Request-Id. Content-Type always application/json."/>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Tech Spec" section="Story 4.3: Error Response Contract" snippet="All error responses follow standard format with retry_after for 429/503. HTTP status code alignment per architecture. Retry-After HTTP header required for retryable errors."/>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Tech Spec" section="Data Models and Contracts - Error Response Types" snippet="ErrorCode enum, ErrorDetails interface with issues array, ApiErrorResponse interface, ApiError class with toResponse() method returning standardized format."/>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Types Overview" snippet="Unit tests in tests/unit with Vitest, Integration tests in tests/integration with real database. Coverage thresholds: 90% lines, 70% functions, 90% branches."/>
+    </docs>
+    <code>
+      <code path="src/lib/errors.ts" kind="error-types" symbol="ErrorCode, ApiError, ERROR_HTTP_STATUS" lines="1-164" reason="Core error types and mapping - needs RATE_LIMITED code added (currently RATE_LIMIT_EXCEEDED), verify all codes map correctly, add retry_after to toResponse()"/>
+      <code path="src/server/services/api/response.ts" kind="response-helpers" symbol="createErrorResponse, validationError, outputValidationError, llmTimeout, llmError" lines="1-339" reason="Error response helpers - needs Retry-After header support, rateLimitedError helper, error message sanitization"/>
+      <code path="src/app/api/v1/intelligence/[processId]/generate/route.ts" kind="api-route" symbol="POST" lines="1-275" reason="Main generate endpoint - needs integration with centralized error handler, verify all error paths return standardized responses"/>
+      <code path="tests/unit/lib/errors.test.ts" kind="test" symbol="ErrorCode, ApiError tests" lines="1-263" reason="Existing unit tests for errors - extend with format compliance, retry_after, no stack traces tests"/>
+      <code path="tests/integration/intelligence-api.test.ts" kind="test" symbol="Authentication, Authorization, LLM Generation tests" lines="1-2102" reason="Existing integration tests - add Error Response Contract describe block for all HTTP status codes"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zod" version="^3.24.2" purpose="Schema validation"/>
+        <package name="next" version="^15.2.3" purpose="API routes and NextResponse"/>
+        <package name="@prisma/client" version="^7.0.1" purpose="Database access"/>
+        <package name="vitest" version="^4.0.14" purpose="Unit and integration testing"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">Error messages must be user-friendly; no stack traces or internal details exposed</constraint>
+    <constraint source="architecture.md">All 429 and 503 responses must include Retry-After HTTP header (seconds)</constraint>
+    <constraint source="architecture.md">Response body for retryable errors must include retry_after field</constraint>
+    <constraint source="tech-spec-epic-4.md">Error response format: { success: false, error: { code, message, details?, retry_after? } }</constraint>
+    <constraint source="testing-strategy-mvp.md">50% coverage minimum for MVP, prefer integration tests for routers</constraint>
+    <constraint source="story">RATE_LIMITED error code may need to be added or renamed (currently RATE_LIMIT_EXCEEDED)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="ApiError" kind="class" signature="new ApiError(code: ErrorCode, message: string, statusCode: number, details?: ErrorDetails, retryAfter?: number)" path="src/lib/errors.ts"/>
+    <interface name="ApiError.toResponse" kind="method" signature="toResponse(): ApiErrorResponse - Currently missing retry_after in response" path="src/lib/errors.ts"/>
+    <interface name="createErrorResponse" kind="function" signature="createErrorResponse(code: ApiErrorCode, message: string, requestId?: string, details?: Record<string, unknown>): Response" path="src/server/services/api/response.ts"/>
+    <interface name="ERROR_HTTP_STATUS" kind="const" signature="Record<ErrorCode, number> - Maps error codes to HTTP status" path="src/lib/errors.ts"/>
+    <interface name="NextResponse" kind="class" signature="new Response(body, { status, headers }) - Use for setting Retry-After header" path="next/server"/>
+  </interfaces>
+
+  <tests>
+    <standards>Use Vitest for unit and integration tests. Unit tests mock external dependencies. Integration tests use real test database. Follow Arrange-Act-Assert pattern. Test behavior not implementation. Coverage thresholds: 90% lines. tRPC routers tested via integration tests. Error response tests should verify both response body format AND HTTP headers.</standards>
+    <locations>
+      <location>tests/unit/lib/errors.test.ts</location>
+      <location>tests/unit/server/middleware/error-handler.test.ts (CREATE)</location>
+      <location>tests/integration/intelligence-api.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test ApiError.toResponse() returns standard format with success: false</idea>
+      <idea ac="1">Test error response includes retry_after field when set</idea>
+      <idea ac="2">Test VALIDATION_ERROR maps to 400 status</idea>
+      <idea ac="3">Test UNAUTHORIZED maps to 401 status</idea>
+      <idea ac="4">Test FORBIDDEN maps to 403 status</idea>
+      <idea ac="5">Test NOT_FOUND maps to 404 status</idea>
+      <idea ac="6">Test RATE_LIMITED maps to 429 status with retry_after</idea>
+      <idea ac="7">Test OUTPUT_VALIDATION_FAILED maps to 500 status</idea>
+      <idea ac="8">Test LLM_TIMEOUT and LLM_ERROR map to 503 with retry_after</idea>
+      <idea ac="9">Test Retry-After HTTP header present on 429 and 503 responses</idea>
+      <idea ac="10">Test error messages do not contain stack traces</idea>
+      <idea ac="10">Test error messages do not contain file paths</idea>
+      <idea ac="10">Test unknown errors return generic 500 without internal details</idea>
+    </ideas>
+  </tests>
+</story-context>

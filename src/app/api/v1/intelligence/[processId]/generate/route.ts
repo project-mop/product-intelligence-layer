@@ -8,6 +8,7 @@
  *
  * @see docs/tech-spec-epic-3.md#Story-3.2-LLM-Gateway-Integration
  * @see docs/architecture.md#Public-API-Patterns
+ * @see docs/stories/4-3-error-response-contract.md
  */
 
 import { NextRequest } from "next/server";
@@ -24,17 +25,12 @@ import {
   forbidden,
   notFound,
   badRequest,
-  llmTimeout,
-  llmError,
-  outputParseFailed,
-  outputValidationError,
   validationError,
 } from "~/server/services/api/response";
-import { ApiError, ErrorCode } from "~/lib/errors";
+import { handleApiError } from "~/server/middleware/error-handler";
 import { validateInput } from "~/server/services/schema";
 import { AnthropicGateway } from "~/server/services/llm";
-import { LLMError } from "~/server/services/llm/types";
-import { ProcessEngine, ProcessEngineError } from "~/server/services/process/engine";
+import { ProcessEngine } from "~/server/services/process/engine";
 import type { ProcessConfig } from "~/server/services/process/types";
 import { getGatewayOverride } from "./testing";
 
@@ -222,53 +218,10 @@ export async function POST(
       false // cached = false (Epic 5 implements caching)
     );
   } catch (error) {
-    // Handle LLM errors
-    if (error instanceof LLMError) {
-      console.error(`[Generate API] LLM error: ${error.code} - ${error.message}`);
-
-      if (error.code === "LLM_TIMEOUT") {
-        return llmTimeout(
-          "LLM request timed out. Please try again.",
-          requestId
-        );
-      }
-
-      // LLM_ERROR and LLM_RATE_LIMITED
-      return llmError(
-        "LLM service error. Please try again later.",
-        requestId
-      );
-    }
-
-    // Handle output validation errors (Story 4.2)
-    if (error instanceof ApiError && error.code === ErrorCode.OUTPUT_VALIDATION_FAILED) {
-      console.error(
-        `[Generate API] Output validation failed: ${error.message}`,
-        error.details
-      );
-
-      return outputValidationError(
-        (error.details?.issues as Array<{ path: string[]; message: string }>) ?? [],
-        requestId
-      );
-    }
-
-    // Handle process engine errors
-    if (error instanceof ProcessEngineError) {
-      console.error(
-        `[Generate API] Process engine error: ${error.code} - ${error.message}`
-      );
-
-      if (error.code === "OUTPUT_PARSE_FAILED") {
-        return outputParseFailed(
-          "Failed to parse LLM response. Please try again.",
-          requestId
-        );
-      }
-    }
-
-    // Unknown errors
-    console.error("[Generate API] Unknown error:", error);
-    return llmError("An unexpected error occurred", requestId);
+    // Use centralized error handler (Story 4.3)
+    // Handles: ApiError, LLMError, ProcessEngineError, and unknown errors
+    // Automatically sets Retry-After headers for 429/503 responses
+    // Sanitizes error messages to remove internal details
+    return handleApiError(error, requestId);
   }
 }

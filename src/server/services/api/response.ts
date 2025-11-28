@@ -6,6 +6,7 @@
  *
  * @see docs/tech-spec-epic-3.md#Response-Format
  * @see docs/architecture.md#Public-API-Patterns
+ * @see docs/stories/4-3-error-response-contract.md
  */
 
 import { generateRequestId } from "~/lib/id";
@@ -36,6 +37,7 @@ export interface SuccessResponse<T> {
 
 /**
  * Standard error response format.
+ * @see docs/stories/4-3-error-response-contract.md AC#1
  */
 export interface ErrorResponse {
   success: false;
@@ -43,6 +45,8 @@ export interface ErrorResponse {
     code: string;
     message: string;
     details?: Record<string, unknown>;
+    /** Seconds to wait before retrying (for 429/503 responses) */
+    retry_after?: number;
   };
 }
 
@@ -61,10 +65,12 @@ export type ApiErrorCode =
   | "OUTPUT_PARSE_FAILED"
   | "OUTPUT_VALIDATION_FAILED"
   | "INVALID_INPUT"
-  | "VALIDATION_ERROR";
+  | "VALIDATION_ERROR"
+  | "RATE_LIMITED";
 
 /**
  * HTTP status codes for each error code.
+ * @see docs/architecture.md#Error-Handling-Matrix
  */
 const ERROR_STATUS_CODES: Record<ApiErrorCode, number> = {
   UNAUTHORIZED: 401,
@@ -76,9 +82,10 @@ const ERROR_STATUS_CODES: Record<ApiErrorCode, number> = {
   LLM_TIMEOUT: 503,
   LLM_ERROR: 503,
   OUTPUT_PARSE_FAILED: 500,
-  OUTPUT_VALIDATION_FAILED: 500, // Server error per AC #6
+  OUTPUT_VALIDATION_FAILED: 500, // Server error per AC #7
   INVALID_INPUT: 400,
   VALIDATION_ERROR: 400,
+  RATE_LIMITED: 429,
 };
 
 /**
@@ -126,25 +133,49 @@ export function createSuccessResponse<T>(
 }
 
 /**
+ * Options for creating error responses.
+ */
+export interface CreateErrorResponseOptions {
+  /** Request ID for tracing */
+  requestId?: string;
+  /** Additional error details */
+  details?: Record<string, unknown>;
+  /** Retry-After value in seconds (for 429/503 responses) */
+  retryAfter?: number;
+}
+
+/**
  * Creates an error API response with standard format.
  *
  * @param code - The error code
  * @param message - Human-readable error message
- * @param requestId - The request ID (generated if not provided)
- * @param details - Optional additional error details
+ * @param options - Optional response configuration
  * @returns Response object with JSON body and headers
  *
  * @example
  * ```typescript
- * return createErrorResponse("NOT_FOUND", "Process not found", requestId);
+ * // Simple error
+ * return createErrorResponse("NOT_FOUND", "Process not found", { requestId });
+ *
+ * // With Retry-After (for 429/503)
+ * return createErrorResponse("RATE_LIMITED", "Rate limit exceeded", {
+ *   requestId,
+ *   retryAfter: 60
+ * });
  * ```
+ *
+ * @see docs/stories/4-3-error-response-contract.md
  */
 export function createErrorResponse(
   code: ApiErrorCode,
   message: string,
-  requestId?: string,
-  details?: Record<string, unknown>
+  options?: CreateErrorResponseOptions | string // string for backwards compatibility (requestId)
 ): Response {
+  // Handle backwards compatibility: if options is string, it's requestId
+  const opts: CreateErrorResponseOptions =
+    typeof options === "string" ? { requestId: options } : options ?? {};
+
+  const { requestId, details, retryAfter } = opts;
   const reqId = requestId ?? generateRequestId();
   const status = ERROR_STATUS_CODES[code];
 
@@ -154,16 +185,34 @@ export function createErrorResponse(
       code,
       message,
       ...(details && { details }),
+      ...(retryAfter !== undefined && { retry_after: retryAfter }),
     },
   };
 
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Request-Id": reqId,
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Request-Id": reqId,
+  };
+
+  // Add Retry-After HTTP header for retryable errors (AC#9)
+  if (retryAfter !== undefined) {
+    headers["Retry-After"] = String(retryAfter);
+  }
+
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+/**
+ * Creates an error response with backwards-compatible signature.
+ * @deprecated Use createErrorResponse with options object instead.
+ */
+export function createErrorResponseLegacy(
+  code: ApiErrorCode,
+  message: string,
+  requestId?: string,
+  details?: Record<string, unknown>
+): Response {
+  return createErrorResponse(code, message, { requestId, details });
 }
 
 /**
@@ -204,7 +253,7 @@ export function badRequest(
   requestId?: string,
   details?: Record<string, unknown>
 ): Response {
-  return createErrorResponse("BAD_REQUEST", message, requestId, details);
+  return createErrorResponse("BAD_REQUEST", message, { requestId, details });
 }
 
 /**
@@ -228,23 +277,74 @@ export function internalError(
 }
 
 /**
- * Creates a 503 LLM Timeout response.
+ * Default retry-after value in seconds for retryable errors.
+ */
+const DEFAULT_RETRY_AFTER_SECONDS = 30;
+
+/**
+ * Creates a 503 LLM Timeout response with Retry-After header.
+ *
+ * @param requestId - The request ID
+ * @param retryAfterSeconds - Seconds to wait before retry (default: 30)
+ * @returns Response with 503 status and Retry-After header
+ *
+ * @see docs/stories/4-3-error-response-contract.md AC#8, AC#9
  */
 export function llmTimeout(
-  message: string,
-  requestId?: string
+  requestId?: string,
+  retryAfterSeconds: number = DEFAULT_RETRY_AFTER_SECONDS
 ): Response {
-  return createErrorResponse("LLM_TIMEOUT", message, requestId);
+  return createErrorResponse(
+    "LLM_TIMEOUT",
+    "Intelligence service timed out. Please retry.",
+    { requestId, retryAfter: retryAfterSeconds }
+  );
 }
 
 /**
- * Creates a 503 LLM Error response.
+ * Creates a 503 LLM Error response with Retry-After header.
+ *
+ * @param requestId - The request ID
+ * @param retryAfterSeconds - Seconds to wait before retry (default: 30)
+ * @returns Response with 503 status and Retry-After header
+ *
+ * @see docs/stories/4-3-error-response-contract.md AC#8, AC#9
  */
 export function llmError(
-  message: string,
+  requestId?: string,
+  retryAfterSeconds: number = DEFAULT_RETRY_AFTER_SECONDS
+): Response {
+  return createErrorResponse(
+    "LLM_ERROR",
+    "Intelligence service temporarily unavailable. Please retry.",
+    { requestId, retryAfter: retryAfterSeconds }
+  );
+}
+
+/**
+ * Creates a 429 Rate Limited response with Retry-After header.
+ *
+ * @param retryAfterSeconds - Seconds to wait before rate limit resets
+ * @param requestId - The request ID
+ * @returns Response with 429 status and Retry-After header
+ *
+ * @example
+ * ```typescript
+ * // Rate limit exceeded, retry after 60 seconds
+ * return rateLimitedError(60, requestId);
+ * ```
+ *
+ * @see docs/stories/4-3-error-response-contract.md AC#6, AC#9
+ */
+export function rateLimitedError(
+  retryAfterSeconds: number,
   requestId?: string
 ): Response {
-  return createErrorResponse("LLM_ERROR", message, requestId);
+  return createErrorResponse(
+    "RATE_LIMITED",
+    `Rate limit exceeded. Please retry after ${retryAfterSeconds} seconds.`,
+    { requestId, retryAfter: retryAfterSeconds }
+  );
 }
 
 /**
@@ -265,7 +365,7 @@ export function invalidInput(
   requestId?: string,
   details?: Record<string, unknown>
 ): Response {
-  return createErrorResponse("INVALID_INPUT", message, requestId, details);
+  return createErrorResponse("INVALID_INPUT", message, { requestId, details });
 }
 
 /**
@@ -297,12 +397,10 @@ export function validationError(
   issues: ValidationIssue[],
   requestId?: string
 ): Response {
-  return createErrorResponse(
-    "VALIDATION_ERROR",
-    "Input validation failed",
+  return createErrorResponse("VALIDATION_ERROR", "Input validation failed", {
     requestId,
-    { issues }
-  );
+    details: { issues },
+  });
 }
 
 /**
@@ -332,7 +430,6 @@ export function outputValidationError(
   return createErrorResponse(
     "OUTPUT_VALIDATION_FAILED",
     "Failed to generate valid response after retry",
-    requestId,
-    { issues }
+    { requestId, details: { issues } }
   );
 }

@@ -1,0 +1,290 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>1</storyId>
+    <title>Input Schema Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-1-input-schema-validation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system</asA>
+    <iWant>to validate all incoming API requests against the expected input schema</iWant>
+    <soThat>malformed requests are rejected before LLM processing, saving costs and providing clear feedback</soThat>
+    <tasks>
+      <task id="1" title="Create Schema Validation Service" acs="1, 2, 7, 8, 9">
+        <subtask>Create src/server/services/schema/validate-input.ts</subtask>
+        <subtask>Create src/server/services/schema/utils.ts for JSON Schema to Zod conversion</subtask>
+        <subtask>Create src/server/services/schema/types.ts for validation types</subtask>
+        <subtask>Create src/server/services/schema/index.ts barrel export</subtask>
+        <subtask>Implement jsonSchemaToZod() function supporting string, number, integer, boolean, array, object types</subtask>
+        <subtask>Implement validateInput() function with .strict() mode</subtask>
+        <subtask>Implement type coercion via Zod preprocessors</subtask>
+        <subtask>Add performance timing and logging</subtask>
+      </task>
+      <task id="2" title="Create ApiError Class and Error Types" acs="4, 5, 6">
+        <subtask>Create src/lib/errors.ts with ErrorCode enum including VALIDATION_ERROR</subtask>
+        <subtask>Create ErrorDetails interface with path, message, issues</subtask>
+        <subtask>Create ApiError class extending Error with code, statusCode, details</subtask>
+        <subtask>Create toResponse() method for standard error format</subtask>
+        <subtask>Define ValidationIssue type: { path: string[], message: string }</subtask>
+        <subtask>Create helper function createValidationError(issues: ValidationIssue[])</subtask>
+      </task>
+      <task id="3" title="Update Generate Endpoint with Input Validation" acs="1, 3, 4, 6">
+        <subtask>Modify src/app/api/v1/intelligence/[processId]/generate/route.ts</subtask>
+        <subtask>After loading ProcessVersion, extract process.inputSchema</subtask>
+        <subtask>Call validateInput(inputSchema, input) before LLM processing</subtask>
+        <subtask>Return 400 with VALIDATION_ERROR code on failure</subtask>
+        <subtask>Include all validation errors in details.issues array</subtask>
+        <subtask>Log validation failure with request_id, process_id</subtask>
+      </task>
+      <task id="4" title="Update Response Helper Functions" acs="4, 5">
+        <subtask>Update src/server/services/api/response.ts</subtask>
+        <subtask>Add validationError(issues: ValidationIssue[], requestId: string) function</subtask>
+        <subtask>Ensure response follows standard format with issues array</subtask>
+      </task>
+      <task id="5" title="Write Unit Tests for Schema Validation" acs="1-10">
+        <subtask>Create tests/unit/services/schema/validate-input.test.ts</subtask>
+        <subtask>Create tests/unit/services/schema/utils.test.ts</subtask>
+        <subtask>Test valid/invalid inputs, type coercion, nested objects, arrays, constraints</subtask>
+        <subtask>Test validation performance (&lt; 10ms)</subtask>
+      </task>
+      <task id="6" title="Write Unit Tests for Error Classes" acs="4, 5, 6">
+        <subtask>Create tests/unit/lib/errors.test.ts</subtask>
+        <subtask>Test ApiError construction and toResponse()</subtask>
+        <subtask>Test createValidationError helper</subtask>
+      </task>
+      <task id="7" title="Write Integration Tests" acs="1, 3, 4, 6">
+        <subtask>Update or create tests/integration/intelligence-api.test.ts</subtask>
+        <subtask>Test valid input passes, invalid returns 400, multiple errors in response</subtask>
+      </task>
+      <task id="8" title="Verification" acs="1-10">
+        <subtask>Run pnpm typecheck, lint, test:unit, test:integration, build</subtask>
+        <subtask>Manual test via TestConsole with invalid input</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">All incoming API requests to /api/v1/intelligence/:processId/generate are validated against the process's inputSchema</ac>
+    <ac id="2">Validation uses Zod schemas converted from JSON Schema definitions</ac>
+    <ac id="3">Invalid requests return 400 status code before any LLM processing occurs</ac>
+    <ac id="4">Error response includes code: "VALIDATION_ERROR" and field-level details</ac>
+    <ac id="5">Field-level errors include path (array of field names) and message (human-readable)</ac>
+    <ac id="6">All validation errors are collected and returned (not just the first error)</ac>
+    <ac id="7">Valid requests proceed to processing with the validated input object</ac>
+    <ac id="8">Unknown/extra fields are stripped from input (strict mode)</ac>
+    <ac id="9">Type coercion is attempted for minor mismatches (string "123" → number 123)</ac>
+    <ac id="10">Validation completes in &lt; 10ms for typical payloads</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification: Schema Validation &amp; Output</title>
+        <section>Story 4.1: Input Schema Validation (lines 585-597)</section>
+        <snippet>Authoritative acceptance criteria and technical details for input validation including Zod-based validation against process.inputSchema with field-level error feedback.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Data Models and Contracts (lines 125-188)</section>
+        <snippet>Defines ErrorCode enum (VALIDATION_ERROR), ErrorDetails interface with issues array containing path and message, and ApiError class with toResponse() method.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Workflows and Sequencing - INPUT VALIDATION (lines 309-325)</section>
+        <snippet>Documents the validation flow: parse JSON, convert JSON Schema to Zod, validate with all errors collected, return 400 with field-level details on failure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Error Handling Matrix (lines 327-339)</section>
+        <snippet>Defines error types and HTTP status codes. Input validation failed returns 400 with code VALIDATION_ERROR and message "Input does not match schema: {details}".</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Error Response Format (lines 665-676)</section>
+        <snippet>Standard error format: { success: false, error: { code, message, details } }. All API responses must follow this structure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Intelligence Generation Flow (lines 172-230)</section>
+        <snippet>Documents the complete request flow including where input validation fits: after API key auth and rate limit check, before cache lookup and LLM call.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Project Structure (lines 57-118)</section>
+        <snippet>Schema validation service should be at src/server/services/schema/. Error types at src/lib/errors.ts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Types Overview and Directory Structure</section>
+        <snippet>Unit tests in tests/unit/, integration tests in tests/integration/. Unit tests mock dependencies, integration tests use real database. Factory patterns for test data.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <lines>80-224</lines>
+        <reason>Main endpoint to modify. Currently validates API key, checks access, loads process, parses body. Need to add input schema validation after line 164 (before Step 7).</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/api/response.ts</path>
+        <kind>service</kind>
+        <symbol>createErrorResponse, ApiErrorCode, ERROR_STATUS_CODES</symbol>
+        <lines>1-266</lines>
+        <reason>Response helper module. Already has INVALID_INPUT error code. Need to add validationError() helper with issues array support. Follow existing patterns.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/schema/sample-generator.ts</path>
+        <kind>utility</kind>
+        <symbol>generateSamplePayload, getSchemaType, generateValueForSchema</symbol>
+        <lines>1-238</lines>
+        <reason>Existing JSON Schema parsing patterns. Reuse getSchemaType() logic and type inference patterns when implementing jsonSchemaToZod() converter.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/llm/types.ts</path>
+        <kind>types</kind>
+        <symbol>LLMError, LLMErrorCode</symbol>
+        <lines>73-87</lines>
+        <reason>Pattern for custom error class. ApiError should follow similar structure with code, message, and cause properties.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process.factory.ts</path>
+        <kind>test-factory</kind>
+        <symbol>processFactory, defaultInputSchema, defaultOutputSchema</symbol>
+        <lines>1-219</lines>
+        <reason>Test factory for Process entities. Use for integration tests. Contains default input/output schemas for testing.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process-version.factory.ts</path>
+        <kind>test-factory</kind>
+        <symbol>processVersionFactory, defaultConfig</symbol>
+        <lines>1-282</lines>
+        <reason>Test factory for ProcessVersion entities. Use for integration tests with createWithProcess() method.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>zod</package>
+        <version>^3.24.2</version>
+        <usage>Runtime schema validation. Use z.object(), z.string(), z.number(), .strict(), .preprocess() for type coercion.</usage>
+      </node>
+      <node>
+        <package>ajv</package>
+        <version>^8.17.1</version>
+        <usage>JSON Schema validation (installed but not needed for this story - use Zod conversion instead).</usage>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^4.0.14</version>
+        <usage>Unit and integration testing framework.</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">All database queries must filter by tenantId for tenant isolation.</constraint>
+    <constraint source="architecture.md">Error responses must follow format: { success: false, error: { code, message, details } }</constraint>
+    <constraint source="architecture.md">Use prefixed IDs: req_* for requests.</constraint>
+    <constraint source="tech-spec-epic-4.md">Validation must complete in &lt; 10ms for typical payloads.</constraint>
+    <constraint source="tech-spec-epic-4.md">All validation errors must be collected and returned, not just the first.</constraint>
+    <constraint source="tech-spec-epic-4.md">Use Zod .strict() mode to strip unknown fields.</constraint>
+    <constraint source="testing-strategy-mvp.md">Unit tests use mocked dependencies. Integration tests use real database.</constraint>
+    <constraint source="testing-strategy-mvp.md">Follow factory patterns for test data (processFactory, processVersionFactory).</constraint>
+    <constraint source="story">No new npm packages required - zod is already installed.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/v1/intelligence/:processId/generate</name>
+      <kind>REST endpoint</kind>
+      <signature>
+        Request: { input: Record&lt;string, unknown&gt; }
+        Headers: Authorization: Bearer pil_live_* or pil_test_*
+        Response (400): { success: false, error: { code: "VALIDATION_ERROR", message: string, details: { issues: [{ path: string[], message: string }] } } }
+      </signature>
+      <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+    </interface>
+    <interface>
+      <name>validateInput</name>
+      <kind>function</kind>
+      <signature>
+        (inputSchema: JSONSchema7, input: Record&lt;string, unknown&gt;) =&gt;
+        { success: true, data: Record&lt;string, unknown&gt; } |
+        { success: false, errors: ValidationIssue[] }
+      </signature>
+      <path>src/server/services/schema/validate-input.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>jsonSchemaToZod</name>
+      <kind>function</kind>
+      <signature>
+        (schema: JSONSchema7) =&gt; z.ZodTypeAny
+        Supports: string, number, integer, boolean, array, object types
+        Constraints: minLength, maxLength, minimum, maximum, pattern, required
+      </signature>
+      <path>src/server/services/schema/utils.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>ApiError</name>
+      <kind>class</kind>
+      <signature>
+        class ApiError extends Error {
+          constructor(code: ErrorCode, message: string, statusCode: number, details?: ErrorDetails, retryAfter?: number)
+          toResponse(): ApiErrorResponse
+        }
+      </signature>
+      <path>src/lib/errors.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>validationError</name>
+      <kind>function</kind>
+      <signature>
+        (issues: ValidationIssue[], requestId?: string) =&gt; Response
+        Returns 400 with VALIDATION_ERROR code and issues in details
+      </signature>
+      <path>src/server/services/api/response.ts (MODIFY)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with mocked dependencies. Integration tests use real PostgreSQL database via testDb. Follow Arrange-Act-Assert pattern. Use factories for test data creation (processFactory, processVersionFactory). Coverage threshold: 90% lines, 70% functions.
+    </standards>
+    <locations>
+      <location>tests/unit/services/schema/*.test.ts (NEW)</location>
+      <location>tests/unit/lib/errors.test.ts (NEW)</location>
+      <location>tests/integration/intelligence-api.test.ts (MODIFY)</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test valid input passes validation and returns validated object</idea>
+      <idea ac="3">Test invalid input returns 400 before LLM call (verify no LLM invocation)</idea>
+      <idea ac="4,5">Test error response includes VALIDATION_ERROR code with path array and message</idea>
+      <idea ac="6">Test multiple validation errors are all collected and returned in single response</idea>
+      <idea ac="7">Test validated input is passed to ProcessEngine with stripped extra fields</idea>
+      <idea ac="8">Test extra fields in input are silently stripped (no error, just removed)</idea>
+      <idea ac="9">Test type coercion: string "123" converted to number 123 for number field</idea>
+      <idea ac="9">Test type coercion: string "true"/"false" handled appropriately</idea>
+      <idea ac="10">Test validation performance completes in under 10ms for typical payload</idea>
+      <idea ac="2">Test JSON Schema to Zod conversion for all supported types: string, number, integer, boolean, array, object</idea>
+      <idea ac="2">Test constraint conversion: minLength, maxLength, minimum, maximum, pattern</idea>
+      <idea ac="1">Test nested object validation with deep paths in error</idea>
+      <idea ac="1">Test array validation with item schema</idea>
+      <idea ac="5">Test error path for nested field like ["attributes", "price"]</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -27,7 +27,9 @@ import {
   llmTimeout,
   llmError,
   outputParseFailed,
+  validationError,
 } from "~/server/services/api/response";
+import { validateInput } from "~/server/services/schema";
 import { AnthropicGateway } from "~/server/services/llm";
 import { LLMError } from "~/server/services/llm/types";
 import { ProcessEngine, ProcessEngineError } from "~/server/services/process/engine";
@@ -163,21 +165,41 @@ export async function POST(
     return badRequest("Field 'input' must be an object", requestId);
   }
 
-  // Step 7: Get process config from version
+  // Step 7: Validate input against process inputSchema
+  const inputSchema = process.inputSchema;
+  if (inputSchema && typeof inputSchema === "object") {
+    const validationResult = validateInput(
+      inputSchema as Record<string, unknown>,
+      input as Record<string, unknown>
+    );
+
+    if (!validationResult.success) {
+      console.warn(
+        `[Generate API] Validation failed for process ${processId}, request ${requestId}:`,
+        validationResult.errors
+      );
+      return validationError(validationResult.errors, requestId);
+    }
+
+    // Use validated (and stripped) input for processing
+    (body as { input: Record<string, unknown> }).input = validationResult.data;
+  }
+
+  // Step 8: Get process config from version
   const config = activeVersion.config as unknown as ProcessConfig;
 
-  // Step 8: Initialize ProcessEngine with LLM gateway
+  // Step 9: Initialize ProcessEngine with LLM gateway
   const gateway = getGateway();
   const engine = new ProcessEngine(gateway);
 
-  // Step 9: Generate intelligence
+  // Step 10: Generate intelligence
   try {
     const result = await engine.generateIntelligence(
       config,
       input as Record<string, unknown>
     );
 
-    // Step 10: Return success response
+    // Step 11: Return success response
     return createSuccessResponse(
       result.data,
       requestId,

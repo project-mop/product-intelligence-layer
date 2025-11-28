@@ -7,7 +7,7 @@
  * @module tests/support/factories/process.factory
  */
 
-import type { Process } from "../../../generated/prisma";
+import { Prisma, type Process } from "../../../generated/prisma";
 import { generateProcessId, generateTenantId } from "~/lib/id";
 import { testDb } from "../db";
 
@@ -108,11 +108,16 @@ async function create(overrides: ProcessFactoryOptions = {}): Promise<Process> {
   const builtData = build({ ...overrides, tenantId });
   // Extract JSON fields to ensure proper typing for Prisma
   const { inputSchema, outputSchema, ...rest } = builtData;
+
+  // Respect explicit null values for schemas (allows "no schema" tests)
+  const hasExplicitNullInput = "inputSchema" in overrides && overrides.inputSchema === null;
+  const hasExplicitNullOutput = "outputSchema" in overrides && overrides.outputSchema === null;
+
   return testDb.process.create({
     data: {
       ...rest,
-      inputSchema: inputSchema ?? defaultInputSchema,
-      outputSchema: outputSchema ?? defaultOutputSchema,
+      inputSchema: hasExplicitNullInput ? Prisma.JsonNull : (inputSchema ?? defaultInputSchema),
+      outputSchema: hasExplicitNullOutput ? Prisma.JsonNull : (outputSchema ?? defaultOutputSchema),
     },
   });
 }

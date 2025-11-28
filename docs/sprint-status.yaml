@@ -69,8 +69,8 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: Schema Validation & Output (6 stories)
-  epic-4: backlog
-  4-1-input-schema-validation: backlog
+  epic-4: contexted
+  4-1-input-schema-validation: done
   4-2-output-schema-enforcement: backlog
   4-3-error-response-contract: backlog
   4-4-llm-unavailability-handling: backlog

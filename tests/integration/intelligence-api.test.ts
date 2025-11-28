@@ -461,7 +461,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: { test: "data" } },
+          body: { input: { input: "test data" } }, // Matches default inputSchema
         }
       );
 
@@ -514,7 +514,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "sandbox test" } }, // Matches default inputSchema
         }
       );
 
@@ -555,7 +555,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "scoped test" } }, // Matches default inputSchema
         }
       );
 
@@ -591,7 +591,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "timeout test" } }, // Matches default inputSchema
         }
       );
 
@@ -631,7 +631,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "error test" } }, // Matches default inputSchema
         }
       );
 
@@ -675,7 +675,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "parse test" } }, // Matches default inputSchema
         }
       );
 
@@ -730,7 +730,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${plainTextKey}`,
           },
-          body: { input: {} },
+          body: { input: { input: "retry test" } }, // Matches default inputSchema
         }
       );
 
@@ -849,6 +849,434 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const requestId = response.headers.get("X-Request-Id");
       expect(requestId).toBeTruthy();
       expect(requestId).toMatch(/^req_[a-f0-9]{16}$/);
+    });
+  });
+
+  describe("Input Schema Validation (Story 4.1)", () => {
+    /**
+     * Create a mock LLM gateway for testing.
+     */
+    function createMockGateway(
+      generateFn: (params: GenerateParams) => Promise<GenerateResult>
+    ): LLMGateway {
+      return {
+        generate: vi.fn(generateFn),
+      };
+    }
+
+    beforeEach(() => {
+      setGatewayOverride(null);
+    });
+
+    afterEach(() => {
+      setGatewayOverride(null);
+    });
+
+    it("should return 400 VALIDATION_ERROR for missing required field (AC: 1, 3, 4)", async () => {
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["productName", "category"],
+        properties: {
+          productName: { type: "string", minLength: 1 },
+          category: { type: "string" },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { productName: "Widget" } }, // Missing category
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("VALIDATION_ERROR");
+      expect(body.error.message).toBe("Input validation failed");
+      expect(body.error.details.issues).toBeDefined();
+      expect(body.error.details.issues.length).toBeGreaterThan(0);
+      expect(body.error.details.issues[0].path).toEqual(["category"]);
+    });
+
+    it("should return all validation errors, not just the first (AC: 6)", async () => {
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["productName", "category", "price"],
+        properties: {
+          productName: { type: "string", minLength: 1 },
+          category: { type: "string" },
+          price: { type: "number", minimum: 0 },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} }, // Missing all required fields
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.error.code).toBe("VALIDATION_ERROR");
+      expect(body.error.details.issues.length).toBe(3);
+
+      const paths = body.error.details.issues.map((i: { path: string[] }) => i.path[0]);
+      expect(paths).toContain("productName");
+      expect(paths).toContain("category");
+      expect(paths).toContain("price");
+    });
+
+    it("should include field path and message in error details (AC: 4, 5)", async () => {
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["attributes"],
+        properties: {
+          attributes: {
+            type: "object",
+            required: ["price"],
+            properties: {
+              price: { type: "number", minimum: 0 },
+            },
+          },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { attributes: { price: -10 } } }, // Negative price
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.error.details.issues[0].path).toEqual(["attributes", "price"]);
+      expect(typeof body.error.details.issues[0].message).toBe("string");
+      expect(body.error.details.issues[0].message.length).toBeGreaterThan(0);
+    });
+
+    it("should pass validation and proceed to LLM for valid input (AC: 1, 7)", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"result": "success"}',
+        usage: { inputTokens: 50, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 150,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["productName"],
+        properties: {
+          productName: { type: "string", minLength: 1 },
+          category: { type: "string" },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { productName: "Widget", category: "Electronics" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body.success).toBe(true);
+      expect(body.data).toEqual({ result: "success" });
+    });
+
+    it("should strip unknown fields from input (AC: 8)", async () => {
+      const mockGateway = createMockGateway(async () => {
+        return {
+          text: '{"result": "processed"}',
+          usage: { inputTokens: 50, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 150,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["productName"],
+        properties: {
+          productName: { type: "string" },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: {
+            input: {
+              productName: "Widget",
+              extraField: "should be stripped",
+              anotherExtra: 123,
+            },
+          },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+      // The extra fields should have been stripped and not caused an error
+    });
+
+    it("should coerce string to number (AC: 9)", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"result": "coerced"}',
+        usage: { inputTokens: 50, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 150,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["price"],
+        properties: {
+          price: { type: "number", minimum: 0 },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { price: "19.99" } }, // String instead of number
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+      // Type coercion should have converted "19.99" to 19.99
+    });
+
+    it("should skip validation when process has no inputSchema", async () => {
+      const mockGateway = createMockGateway(async () => ({
+        text: '{"result": "no schema"}',
+        usage: { inputTokens: 50, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 150,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema: null, // No schema
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { anything: "goes" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+    });
+
+    it("should not call LLM on validation failure (AC: 3)", async () => {
+      const mockGenerate = vi.fn();
+      const mockGateway: LLMGateway = {
+        generate: mockGenerate,
+      };
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const inputSchema = {
+        type: "object",
+        required: ["productName"],
+        properties: {
+          productName: { type: "string", minLength: 1 },
+        },
+      };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "PRODUCTION",
+        scopes: ["process:*"],
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} }, // Missing required field
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(400);
+      // LLM should NOT have been called
+      expect(mockGenerate).not.toHaveBeenCalled();
     });
   });
 });

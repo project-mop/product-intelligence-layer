@@ -59,7 +59,8 @@ export type ApiErrorCode =
   | "LLM_TIMEOUT"
   | "LLM_ERROR"
   | "OUTPUT_PARSE_FAILED"
-  | "INVALID_INPUT";
+  | "INVALID_INPUT"
+  | "VALIDATION_ERROR";
 
 /**
  * HTTP status codes for each error code.
@@ -75,6 +76,7 @@ const ERROR_STATUS_CODES: Record<ApiErrorCode, number> = {
   LLM_ERROR: 503,
   OUTPUT_PARSE_FAILED: 500,
   INVALID_INPUT: 400,
+  VALIDATION_ERROR: 400,
 };
 
 /**
@@ -262,4 +264,41 @@ export function invalidInput(
   details?: Record<string, unknown>
 ): Response {
   return createErrorResponse("INVALID_INPUT", message, requestId, details);
+}
+
+/**
+ * Validation issue with path and message.
+ */
+export interface ValidationIssue {
+  /** Path to the field that failed validation (e.g., ["attributes", "price"]) */
+  path: string[];
+  /** Human-readable error message */
+  message: string;
+}
+
+/**
+ * Creates a 400 Validation Error response with field-level details.
+ *
+ * @param issues - Array of validation issues with paths and messages
+ * @param requestId - The request ID
+ * @returns Response object with JSON body and headers
+ *
+ * @example
+ * ```typescript
+ * return validationError([
+ *   { path: ["productName"], message: "Required" },
+ *   { path: ["price"], message: "Expected number, received string" }
+ * ], requestId);
+ * ```
+ */
+export function validationError(
+  issues: ValidationIssue[],
+  requestId?: string
+): Response {
+  return createErrorResponse(
+    "VALIDATION_ERROR",
+    "Input validation failed",
+    requestId,
+    { issues }
+  );
 }

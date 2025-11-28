@@ -440,7 +440,10 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       setGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
-      const process = await processFactory.create({ tenantId: tenant.id });
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation for basic generation test
+      });
       await processVersionFactory.create({
         processId: process.id,
         environment: "PRODUCTION",
@@ -494,7 +497,10 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       setGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
-      const process = await processFactory.create({ tenantId: tenant.id });
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
       await processVersionFactory.create({
         processId: process.id,
         environment: "SANDBOX",
@@ -535,7 +541,10 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       setGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
-      const process = await processFactory.create({ tenantId: tenant.id });
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
       await processVersionFactory.create({
         processId: process.id,
         environment: "PRODUCTION",
@@ -646,6 +655,8 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
 
     it("should return 500 on output parse failure after retry (AC: 6, 7)", async () => {
       // Return invalid JSON both times to trigger parse failure
+      // Note: This tests the legacy JSON parse retry path (without outputSchema)
+      // With outputSchema, OUTPUT_VALIDATION_FAILED would be thrown instead
       const mockGateway = createMockGateway(async () => ({
         text: "This is not valid JSON at all {{",
         usage: { inputTokens: 10, outputTokens: 5 },
@@ -655,7 +666,10 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       setGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
-      const process = await processFactory.create({ tenantId: tenant.id });
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation to test legacy parse failure
+      });
       await processVersionFactory.create({
         processId: process.id,
         environment: "PRODUCTION",
@@ -710,7 +724,10 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       setGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
-      const process = await processFactory.create({ tenantId: tenant.id });
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation for retry test
+      });
       await processVersionFactory.create({
         processId: process.id,
         environment: "PRODUCTION",
@@ -1047,6 +1064,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const process = await processFactory.create({
         tenantId: tenant.id,
         inputSchema,
+        outputSchema: null, // Skip output validation for input test
       });
       await processVersionFactory.create({
         processId: process.id,
@@ -1102,6 +1120,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const process = await processFactory.create({
         tenantId: tenant.id,
         inputSchema,
+        outputSchema: null, // Skip output validation for input test
       });
       await processVersionFactory.create({
         processId: process.id,
@@ -1158,6 +1177,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const process = await processFactory.create({
         tenantId: tenant.id,
         inputSchema,
+        outputSchema: null, // Skip output validation for input test
       });
       await processVersionFactory.create({
         processId: process.id,
@@ -1200,7 +1220,8 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const tenant = await tenantFactory.create();
       const process = await processFactory.create({
         tenantId: tenant.id,
-        inputSchema: null, // No schema
+        inputSchema: null, // No input schema
+        outputSchema: null, // No output schema
       });
       await processVersionFactory.create({
         processId: process.id,
@@ -1278,6 +1299,511 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       // LLM should NOT have been called
       expect(mockGenerate).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("Output Schema Enforcement (Story 4.2)", () => {
+  /**
+   * Create a mock LLM gateway for testing.
+   */
+  function createMockGateway(responses: Array<{ text: string }>): LLMGateway {
+    let callIndex = 0;
+    return {
+      generate: vi.fn().mockImplementation(async () => {
+        const response = responses[callIndex] ?? responses[responses.length - 1];
+        callIndex++;
+        return {
+          text: response?.text ?? '{}',
+          usage: { inputTokens: 50, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 150,
+        };
+      }),
+    };
+  }
+
+  beforeEach(() => {
+    setGatewayOverride(null);
+  });
+
+  afterEach(() => {
+    setGatewayOverride(null);
+  });
+
+  it("should validate output against outputSchema (AC: 1, 2)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"shortDescription": "A great product", "category": "Electronics"}' },
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription", "category"],
+      properties: {
+        shortDescription: { type: "string", minLength: 1 },
+        category: { type: "string" },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.data).toEqual({
+      shortDescription: "A great product",
+      category: "Electronics",
+    });
+  });
+
+  it("should retry on JSON parse failure (AC: 3)", async () => {
+    const mockGateway = createMockGateway([
+      { text: "This is not valid JSON" }, // First attempt fails
+      { text: '{"shortDescription": "Retried product"}' }, // Second attempt succeeds
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string" },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "retry test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data).toEqual({ shortDescription: "Retried product" });
+
+    // Should have called LLM twice (initial + retry)
+    expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("should retry on schema validation failure (AC: 4)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"wrongField": "value"}' }, // First attempt - wrong schema
+      { text: '{"shortDescription": "Correct this time"}' }, // Second attempt succeeds
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string", minLength: 1 },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "schema retry test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data).toEqual({ shortDescription: "Correct this time" });
+
+    // Should have called LLM twice
+    expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("should include schema in retry prompt (AC: 5)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"wrong": "field"}' },
+      { text: '{"shortDescription": "Fixed"}' },
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string" },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "prompt test" } },
+      }
+    );
+
+    await generateHandler(request, createParams(process.id));
+
+    // Check the retry call included schema in prompt
+    const retryCalls = vi.mocked(mockGateway.generate).mock.calls;
+    expect(retryCalls.length).toBe(2);
+
+    const retryPrompt = retryCalls[1]?.[0]?.systemPrompt;
+    expect(retryPrompt).toContain("PREVIOUS ATTEMPT FAILED VALIDATION");
+    expect(retryPrompt).toContain("shortDescription");
+  });
+
+  it("should return 500 OUTPUT_VALIDATION_FAILED after two failures (AC: 6)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"wrong": "field"}' }, // First attempt fails validation
+      { text: '{"still": "wrong"}' }, // Second attempt also fails
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string", minLength: 1 },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "double failure test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(500);
+
+    const body = await response.json();
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("OUTPUT_VALIDATION_FAILED");
+    expect(body.error.message).toBe("Failed to generate valid response after retry");
+  });
+
+  it("should include field-level error details (AC: 7)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"shortDescription": ""}' }, // Empty string fails minLength
+      { text: '{}' }, // Missing required field
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string", minLength: 1 },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "field error test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(500);
+
+    const body = await response.json();
+    expect(body.error.code).toBe("OUTPUT_VALIDATION_FAILED");
+    expect(body.error.details).toBeDefined();
+    expect(body.error.details.issues).toBeDefined();
+    expect(Array.isArray(body.error.details.issues)).toBe(true);
+    expect(body.error.details.issues.length).toBeGreaterThan(0);
+    expect(body.error.details.issues[0]).toMatchObject({
+      path: expect.any(Array),
+      message: expect.any(String),
+    });
+  });
+
+  it("should return typed output object on success (AC: 8)", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"shortDescription": "Widget X", "price": 29.99, "inStock": true}' },
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string" },
+        price: { type: "number" },
+        inStock: { type: "boolean" },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "typed output test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data.shortDescription).toBe("Widget X");
+    expect(body.data.price).toBe(29.99);
+    expect(body.data.inStock).toBe(true);
+    // Types should be preserved
+    expect(typeof body.data.price).toBe("number");
+    expect(typeof body.data.inStock).toBe("boolean");
+  });
+
+  it("should coerce types in output (AC: 9)", async () => {
+    // LLM returns price as string, should be coerced to number
+    const mockGateway = createMockGateway([
+      { text: '{"shortDescription": "Widget", "price": "19.99"}' },
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const outputSchema = {
+      type: "object",
+      required: ["shortDescription"],
+      properties: {
+        shortDescription: { type: "string" },
+        price: { type: "number" },
+      },
+    };
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema,
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "coercion test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data.price).toBe(19.99);
+    expect(typeof body.data.price).toBe("number"); // Coerced from string
+  });
+
+  it("should skip output validation when process has no outputSchema", async () => {
+    const mockGateway = createMockGateway([
+      { text: '{"anything": "goes"}' },
+    ]);
+    setGatewayOverride(mockGateway);
+
+    const tenant = await tenantFactory.create();
+    const process = await processFactory.create({
+      tenantId: tenant.id,
+      outputSchema: null, // No output schema
+    });
+    await processVersionFactory.create({
+      processId: process.id,
+      environment: "PRODUCTION",
+    });
+
+    const { plainTextKey } = await apiKeyFactory.create({
+      tenantId: tenant.id,
+      environment: "PRODUCTION",
+      scopes: ["process:*"],
+    });
+
+    const request = createRequest(
+      `/api/v1/intelligence/${process.id}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${plainTextKey}`,
+        },
+        body: { input: { input: "no schema test" } },
+      }
+    );
+
+    const response = await generateHandler(request, createParams(process.id));
+
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data).toEqual({ anything: "goes" });
+
+    // Should only call LLM once (no validation retry needed)
+    expect(mockGateway.generate).toHaveBeenCalledTimes(1);
   });
 });
 

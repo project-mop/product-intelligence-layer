@@ -5,22 +5,43 @@
  * 1. Assemble prompt from ProcessConfig
  * 2. Call LLM gateway
  * 3. Parse response as JSON
- * 4. Retry once on parse failure
- * 5. Return structured result with metadata
+ * 4. Validate output against schema (Story 4.2)
+ * 5. Retry once on parse/validation failure
+ * 6. Return structured result with metadata
  *
  * @see docs/tech-spec-epic-3.md#Story-3.2-LLM-Gateway-Integration
  * @see docs/architecture.md#Intelligence-Generation-Flow
+ * @see docs/stories/4-2-output-schema-enforcement.md
  */
 
+import type { JSONSchema7 } from "json-schema";
 import type { LLMGateway } from "../llm/types";
 import type { ProcessConfig } from "./types";
 import { assemblePrompt, enhancePromptForRetry } from "./prompt";
+import {
+  validateOutputWithRetry,
+  type AttemptLog,
+} from "./retry-handler";
+
+/**
+ * Options for intelligence generation.
+ */
+export interface GenerateOptions {
+  /** Output schema to validate against (Story 4.2) */
+  outputSchema?: JSONSchema7 | Record<string, unknown>;
+  /** Request context for logging */
+  requestContext?: {
+    requestId: string;
+    processId: string;
+    tenantId: string;
+  };
+}
 
 /**
  * Result from intelligence generation.
  */
 export interface IntelligenceResult {
-  /** Generated data (parsed JSON from LLM) */
+  /** Generated data (parsed and validated JSON from LLM) */
   data: Record<string, unknown>;
 
   /** Metadata about the generation */
@@ -36,6 +57,8 @@ export interface IntelligenceResult {
       inputTokens: number;
       outputTokens: number;
     };
+    /** Validation attempt logs (Story 4.2) */
+    validationAttempts?: AttemptLog[];
   };
 }
 
@@ -65,6 +88,7 @@ export class ProcessEngineError extends Error {
  * - Prompt assembly
  * - LLM invocation
  * - JSON parsing with retry
+ * - Output schema validation with retry (Story 4.2)
  * - Error handling
  */
 export class ProcessEngine {
@@ -75,13 +99,16 @@ export class ProcessEngine {
    *
    * @param config - Process configuration with prompts and settings
    * @param input - Input data to process
+   * @param options - Optional generation options including outputSchema for validation
    * @returns Intelligence result with generated data and metadata
    * @throws LLMError on LLM failures
-   * @throws ProcessEngineError on parse failures after retry
+   * @throws ProcessEngineError on parse failures after retry (when no outputSchema)
+   * @throws ApiError with OUTPUT_VALIDATION_FAILED on schema validation failures (Story 4.2)
    */
   async generateIntelligence(
     config: ProcessConfig,
-    input: Record<string, unknown>
+    input: Record<string, unknown>,
+    options?: GenerateOptions
   ): Promise<IntelligenceResult> {
     const startTime = Date.now();
 
@@ -96,7 +123,41 @@ export class ProcessEngine {
       temperature: config.temperature,
     });
 
-    // Step 3: Try to parse response
+    // Step 3: If outputSchema provided, use the new validation with retry logic (Story 4.2)
+    if (options?.outputSchema) {
+      const requestContext = options.requestContext ?? {
+        requestId: "unknown",
+        processId: "unknown",
+        tenantId: "unknown",
+      };
+
+      // validateOutputWithRetry handles:
+      // - JSON parsing
+      // - Schema validation
+      // - Automatic retry with stricter prompt on failure
+      // - Throwing OUTPUT_VALIDATION_FAILED after second failure
+      const validationResult = await validateOutputWithRetry(
+        options.outputSchema,
+        llmResult,
+        this.llmGateway,
+        prompt,
+        config,
+        requestContext
+      );
+
+      return {
+        data: validationResult.data,
+        meta: {
+          latencyMs: Date.now() - startTime,
+          retried: validationResult.retried,
+          model: llmResult.model,
+          usage: llmResult.usage,
+          validationAttempts: validationResult.attemptResults,
+        },
+      };
+    }
+
+    // Step 4 (legacy): No outputSchema - use original JSON parse with retry
     const parseResult = this.tryParseJson(llmResult.text);
 
     if (parseResult.success) {
@@ -111,7 +172,7 @@ export class ProcessEngine {
       };
     }
 
-    // Step 4: Retry with stricter prompt
+    // Step 5: Retry with stricter prompt (legacy path)
     console.warn(
       `[ProcessEngine] JSON parse failed, retrying with stricter prompt. Error: ${parseResult.error}`
     );
@@ -125,7 +186,7 @@ export class ProcessEngine {
       temperature: config.temperature,
     });
 
-    // Step 5: Try to parse retry response
+    // Step 6: Try to parse retry response
     const retryParseResult = this.tryParseJson(retryResult.text);
 
     if (retryParseResult.success) {
@@ -145,7 +206,7 @@ export class ProcessEngine {
       };
     }
 
-    // Step 6: Fail after second parse failure
+    // Step 7: Fail after second parse failure
     console.error(
       `[ProcessEngine] JSON parse failed after retry. Error: ${retryParseResult.error}`
     );

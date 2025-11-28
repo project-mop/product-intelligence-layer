@@ -59,6 +59,7 @@ export type ApiErrorCode =
   | "LLM_TIMEOUT"
   | "LLM_ERROR"
   | "OUTPUT_PARSE_FAILED"
+  | "OUTPUT_VALIDATION_FAILED"
   | "INVALID_INPUT"
   | "VALIDATION_ERROR";
 
@@ -75,6 +76,7 @@ const ERROR_STATUS_CODES: Record<ApiErrorCode, number> = {
   LLM_TIMEOUT: 503,
   LLM_ERROR: 503,
   OUTPUT_PARSE_FAILED: 500,
+  OUTPUT_VALIDATION_FAILED: 500, // Server error per AC #6
   INVALID_INPUT: 400,
   VALIDATION_ERROR: 400,
 };
@@ -298,6 +300,38 @@ export function validationError(
   return createErrorResponse(
     "VALIDATION_ERROR",
     "Input validation failed",
+    requestId,
+    { issues }
+  );
+}
+
+/**
+ * Creates a 500 Output Validation Failed response with field-level details.
+ *
+ * Used when LLM output fails schema validation after retry (Story 4.2).
+ * Returns 500 because this is a server-side failure (LLM not producing valid output),
+ * not a client input error.
+ *
+ * @param issues - Array of validation issues with paths and messages
+ * @param requestId - The request ID
+ * @returns Response object with JSON body and headers
+ *
+ * @example
+ * ```typescript
+ * return outputValidationError([
+ *   { path: ["shortDescription"], message: "Expected string, received undefined" }
+ * ], requestId);
+ * ```
+ *
+ * @see docs/stories/4-2-output-schema-enforcement.md
+ */
+export function outputValidationError(
+  issues: ValidationIssue[],
+  requestId?: string
+): Response {
+  return createErrorResponse(
+    "OUTPUT_VALIDATION_FAILED",
+    "Failed to generate valid response after retry",
     requestId,
     { issues }
   );

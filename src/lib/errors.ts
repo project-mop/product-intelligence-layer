@@ -32,6 +32,8 @@ export enum ErrorCode {
   LLM_ERROR = "LLM_ERROR",
   /** Failed to parse LLM output */
   OUTPUT_PARSE_FAILED = "OUTPUT_PARSE_FAILED",
+  /** LLM output failed schema validation after retry (Story 4.2) */
+  OUTPUT_VALIDATION_FAILED = "OUTPUT_VALIDATION_FAILED",
   /** Invalid input data */
   INVALID_INPUT = "INVALID_INPUT",
   /** Rate limit exceeded */
@@ -52,6 +54,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   [ErrorCode.LLM_TIMEOUT]: 503,
   [ErrorCode.LLM_ERROR]: 503,
   [ErrorCode.OUTPUT_PARSE_FAILED]: 500,
+  [ErrorCode.OUTPUT_VALIDATION_FAILED]: 500, // Server error per AC #6
   [ErrorCode.INVALID_INPUT]: 400,
   [ErrorCode.RATE_LIMIT_EXCEEDED]: 429,
 };

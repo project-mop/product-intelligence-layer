@@ -27,8 +27,10 @@ import {
   llmTimeout,
   llmError,
   outputParseFailed,
+  outputValidationError,
   validationError,
 } from "~/server/services/api/response";
+import { ApiError, ErrorCode } from "~/lib/errors";
 import { validateInput } from "~/server/services/schema";
 import { AnthropicGateway } from "~/server/services/llm";
 import { LLMError } from "~/server/services/llm/types";
@@ -192,11 +194,24 @@ export async function POST(
   const gateway = getGateway();
   const engine = new ProcessEngine(gateway);
 
-  // Step 10: Generate intelligence
+  // Step 10: Generate intelligence with output schema validation (Story 4.2)
   try {
+    // Get outputSchema from process for validation
+    const outputSchema = process.outputSchema as Record<string, unknown> | null;
+
     const result = await engine.generateIntelligence(
       config,
-      input as Record<string, unknown>
+      input as Record<string, unknown>,
+      outputSchema
+        ? {
+            outputSchema,
+            requestContext: {
+              requestId,
+              processId,
+              tenantId: apiKeyContext.tenantId,
+            },
+          }
+        : undefined
     );
 
     // Step 11: Return success response
@@ -221,6 +236,19 @@ export async function POST(
       // LLM_ERROR and LLM_RATE_LIMITED
       return llmError(
         "LLM service error. Please try again later.",
+        requestId
+      );
+    }
+
+    // Handle output validation errors (Story 4.2)
+    if (error instanceof ApiError && error.code === ErrorCode.OUTPUT_VALIDATION_FAILED) {
+      console.error(
+        `[Generate API] Output validation failed: ${error.message}`,
+        error.details
+      );
+
+      return outputValidationError(
+        (error.details?.issues as Array<{ path: string[]; message: string }>) ?? [],
         requestId
       );
     }

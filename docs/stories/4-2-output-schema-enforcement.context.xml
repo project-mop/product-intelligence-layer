@@ -1,0 +1,289 @@
+<story-context id="4-2-output-schema-enforcement" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>2</storyId>
+    <title>Output Schema Enforcement</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-2-output-schema-enforcement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system</asA>
+    <iWant>to enforce that all LLM outputs conform to the defined JSON schema with automatic retry on failure</iWant>
+    <soThat>integrations can rely on consistent response structures and invalid outputs are handled gracefully</soThat>
+    <tasks>
+      <task id="1" acs="1,2,8,9">Create Output Validation Service - validate-output.ts with validateOutput() function reusing jsonSchemaToZod()</task>
+      <task id="2" acs="3,4,5">Implement Retry Logic - retry-handler.ts with validateOutputWithRetry() and stricter prompt builder</task>
+      <task id="3" acs="6,7">Add OUTPUT_VALIDATION_FAILED Error Type - extend errors.ts and response.ts</task>
+      <task id="4" acs="10">Add LLM Attempt Logging - log both attempts with prompt, response, and validation results</task>
+      <task id="5" acs="1,3,4,6">Integrate Output Validation into Generate Endpoint - modify engine.ts or route.ts</task>
+      <task id="6" acs="1-10">Write Unit Tests - validate-output.test.ts and retry-handler.test.ts</task>
+      <task id="7" acs="1,3,4,6,7">Write Integration Tests - extend intelligence-api.test.ts</task>
+      <task id="8" acs="1-10">Verification - typecheck, lint, unit tests, integration tests, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">LLM responses are validated against the process's outputSchema before returning to caller</ac>
+    <ac id="2">Validation uses Zod schemas converted from JSON Schema definitions</ac>
+    <ac id="3">JSON parse failures trigger one automatic retry with stricter prompt</ac>
+    <ac id="4">Schema validation failures trigger one automatic retry with stricter prompt</ac>
+    <ac id="5">Retry prompt includes: "PREVIOUS ATTEMPT FAILED VALIDATION. Your response MUST be valid JSON matching: {schema description}"</ac>
+    <ac id="6">After second failure, return 500 with code: "OUTPUT_VALIDATION_FAILED"</ac>
+    <ac id="7">Error response includes field-level details showing which fields failed validation</ac>
+    <ac id="8">Successful validation returns the parsed, typed output object</ac>
+    <ac id="9">Type coercion is attempted for minor mismatches (e.g., string numbers to numbers)</ac>
+    <ac id="10">Both LLM attempts are logged for debugging (prompt and raw response, redacted for PII)</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Story 4.2: Output Schema Enforcement</section>
+        <snippet>Defines all acceptance criteria, output validation flow, retry prompt strategy, and OUTPUT_VALIDATION_FAILED error type with field-level details.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Error Handling Matrix, Public API Patterns</section>
+        <snippet>Defines standard error response format { success: false, error: { code, message, details } } and HTTP status code mapping for OUTPUT_VALIDATION_FAILED (500).</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Definitions</title>
+        <section>Epic 4: Schema Validation and Output</section>
+        <snippet>Story 4.2 focuses on output schema enforcement with automatic retry on validation failure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Test Types Overview, Coverage Requirements</section>
+        <snippet>Unit tests in tests/unit/, integration tests in tests/integration/. Coverage thresholds: 90% lines, 70% functions. Use Vitest + factories pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-1-input-schema-validation.md</path>
+        <title>Story 4.1: Input Schema Validation</title>
+        <section>Dev Agent Record</section>
+        <snippet>Completed implementation of jsonSchemaToZod(), validateInput(), ApiError class, and response helpers. Patterns to REUSE for output validation.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <!-- Schema Validation Service (REUSE) -->
+      <artifact>
+        <path>src/server/services/schema/utils.ts</path>
+        <kind>service</kind>
+        <symbol>jsonSchemaToZod</symbol>
+        <lines>37-72</lines>
+        <reason>REUSE: Core JSON Schema to Zod conversion function. Supports all major types (string, number, integer, boolean, array, object) and constraints. Already has type coercion via preprocess for numbers and booleans.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/schema/types.ts</path>
+        <kind>types</kind>
+        <symbol>ValidationIssue, ValidationResult</symbol>
+        <lines>1-43</lines>
+        <reason>REUSE: Validation types - ValidationIssue { path, message }, ValidationSuccess, ValidationFailure. Extend for output validation result type.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/schema/validate-input.ts</path>
+        <kind>service</kind>
+        <symbol>validateInput</symbol>
+        <reason>REFERENCE: Pattern for implementing validateOutput(). Shows timing, logging, and error collection.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/schema/index.ts</path>
+        <kind>barrel</kind>
+        <symbol>schema exports</symbol>
+        <reason>MODIFY: Add validateOutput export after creating it.</reason>
+      </artifact>
+
+      <!-- Error Handling (EXTEND) -->
+      <artifact>
+        <path>src/lib/errors.ts</path>
+        <kind>errors</kind>
+        <symbol>ErrorCode, ApiError, createValidationError</symbol>
+        <lines>14-39</lines>
+        <reason>EXTEND: ErrorCode enum already has OUTPUT_PARSE_FAILED. Add OUTPUT_VALIDATION_FAILED for schema validation failures. Follow createValidationError pattern for createOutputValidationError.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/api/response.ts</path>
+        <kind>helpers</kind>
+        <symbol>validationError, ApiErrorCode</symbol>
+        <lines>52-80, 294-304</lines>
+        <reason>EXTEND: Add OUTPUT_VALIDATION_FAILED to ApiErrorCode type. Add outputValidationError() helper function following validationError() pattern.</reason>
+      </artifact>
+
+      <!-- Process Engine (MODIFY) -->
+      <artifact>
+        <path>src/server/services/process/engine.ts</path>
+        <kind>service</kind>
+        <symbol>ProcessEngine, generateIntelligence, tryParseJson</symbol>
+        <lines>70-216</lines>
+        <reason>MODIFY: Current engine has JSON parse retry. Story 4.2 adds OUTPUT SCHEMA validation after JSON parse succeeds. Integrate validateOutputWithRetry() or inline validation logic here.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/process/prompt.ts</path>
+        <kind>service</kind>
+        <symbol>assemblePrompt, enhancePromptForRetry</symbol>
+        <reason>REFERENCE: Pattern for prompt assembly. enhancePromptForRetry() adds stricter JSON instructions - extend for schema validation failure prompts.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/process/types.ts</path>
+        <kind>types</kind>
+        <symbol>ProcessConfig</symbol>
+        <reason>REFERENCE: ProcessConfig includes outputSchema field from process version.</reason>
+      </artifact>
+
+      <!-- LLM Gateway (REFERENCE) -->
+      <artifact>
+        <path>src/server/services/llm/types.ts</path>
+        <kind>types</kind>
+        <symbol>LLMGateway, GenerateParams, GenerateResult</symbol>
+        <lines>14-68</lines>
+        <reason>REFERENCE: LLMGateway interface for making retry calls. GenerateResult has text, usage, model, durationMs.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/llm/anthropic.ts</path>
+        <kind>service</kind>
+        <symbol>AnthropicGateway</symbol>
+        <reason>REFERENCE: Production LLM gateway implementation. Used via ProcessEngine.</reason>
+      </artifact>
+
+      <!-- API Route (MODIFY) -->
+      <artifact>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>route</kind>
+        <symbol>POST handler</symbol>
+        <lines>82-246</lines>
+        <reason>MODIFY: Handle OUTPUT_VALIDATION_FAILED error from ProcessEngine. Add outputValidationError() response helper call.</reason>
+      </artifact>
+
+      <!-- Tests (REFERENCE/EXTEND) -->
+      <artifact>
+        <path>tests/unit/services/schema/utils.test.ts</path>
+        <kind>test</kind>
+        <symbol>jsonSchemaToZod tests</symbol>
+        <reason>REFERENCE: Test patterns for schema conversion. 35 tests covering all types and constraints.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/services/schema/validate-input.test.ts</path>
+        <kind>test</kind>
+        <symbol>validateInput tests</symbol>
+        <reason>REFERENCE: Test patterns for validation function. Use same structure for validate-output.test.ts.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/intelligence-api.test.ts</path>
+        <kind>test</kind>
+        <symbol>Input Schema Validation tests</symbol>
+        <reason>EXTEND: Add "Output Schema Enforcement (Story 4.2)" describe block. Use LLM gateway mock pattern for testing retry logic.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>processFactory</symbol>
+        <reason>REUSE: Create test processes with outputSchema field set.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/process-version.factory.ts</path>
+        <kind>factory</kind>
+        <symbol>processVersionFactory</symbol>
+        <reason>REUSE: Create process versions with config for testing.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>zod</package>
+        <version>^3.24.2</version>
+        <usage>Runtime schema validation - jsonSchemaToZod conversion and validation</usage>
+      </node>
+      <node>
+        <package>@anthropic-ai/sdk</package>
+        <version>^0.71.0</version>
+        <usage>LLM gateway for generating responses and retries</usage>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^4.0.14</version>
+        <usage>Unit and integration testing framework</usage>
+      </node>
+      <node>
+        <package>@types/json-schema</package>
+        <version>^7.0.15</version>
+        <usage>TypeScript types for JSON Schema (JSONSchema7)</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface>
+      <name>validateOutput</name>
+      <kind>function</kind>
+      <signature>function validateOutput(outputSchema: JSONSchema7 | Record&lt;string, unknown&gt;, rawResponse: string): OutputValidationResult</signature>
+      <path>src/server/services/schema/validate-output.ts (NEW)</path>
+      <notes>Parse JSON from raw response, validate against schema using jsonSchemaToZod(). Return { success: true, data } or { success: false, parseError?, validationErrors? }</notes>
+    </interface>
+    <interface>
+      <name>validateOutputWithRetry</name>
+      <kind>function</kind>
+      <signature>async function validateOutputWithRetry(outputSchema: JSONSchema7, rawResponse: string, gateway: LLMGateway, originalPrompt: AssembledPrompt, config: ProcessConfig): Promise&lt;OutputValidationWithRetryResult&gt;</signature>
+      <path>src/server/services/process/retry-handler.ts (NEW)</path>
+      <notes>Validate first response. On failure, build stricter prompt and call LLM again. Return validated data with metadata (retried, attempts) or throw ApiError.</notes>
+    </interface>
+    <interface>
+      <name>outputValidationError</name>
+      <kind>function</kind>
+      <signature>function outputValidationError(issues: ValidationIssue[], requestId?: string): Response</signature>
+      <path>src/server/services/api/response.ts (MODIFY)</path>
+      <notes>Return 500 OUTPUT_VALIDATION_FAILED with field-level error details. Follow validationError() pattern.</notes>
+    </interface>
+    <interface>
+      <name>LLMGateway.generate</name>
+      <kind>method</kind>
+      <signature>generate(params: GenerateParams): Promise&lt;GenerateResult&gt;</signature>
+      <path>src/server/services/llm/types.ts</path>
+      <notes>Used for retry calls. Pass same params with enhanced prompt.</notes>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint type="architecture">Reuse jsonSchemaToZod() from src/server/services/schema/utils.ts - do not duplicate conversion logic</constraint>
+    <constraint type="architecture">Error response format must match architecture.md standard: { success: false, error: { code, message, details: { issues } } }</constraint>
+    <constraint type="architecture">OUTPUT_VALIDATION_FAILED returns HTTP 500 (server error, not client input error)</constraint>
+    <constraint type="architecture">Retry prompt must include schema description and previous validation errors per AC #5</constraint>
+    <constraint type="performance">Output validation must complete in &lt; 5ms per tech spec (validation only, not LLM call)</constraint>
+    <constraint type="security">Redact potential PII from logs (input/output data containing customer info)</constraint>
+    <constraint type="testing">Unit tests for validation functions, integration tests for full request flow with mocked LLM</constraint>
+    <constraint type="testing">Coverage thresholds: 90% lines, 70% functions per testing-strategy-mvp.md</constraint>
+    <constraint type="layer">Schema validation in src/server/services/schema/, retry logic in src/server/services/process/</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Vitest for unit and integration tests. Use factories for test data creation (processFactory, processVersionFactory). Mock LLM gateway for testing retry logic. Follow Arrange-Act-Assert pattern. Integration tests use real database with automatic cleanup.</standards>
+    <locations>
+      <location>tests/unit/services/schema/validate-output.test.ts (NEW)</location>
+      <location>tests/unit/services/process/retry-handler.test.ts (NEW)</location>
+      <location>tests/integration/intelligence-api.test.ts (EXTEND)</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test validateOutput() with valid JSON matching schema returns success with parsed data</idea>
+      <idea ac="1,2">Test validateOutput() with valid JSON not matching schema returns validation errors</idea>
+      <idea ac="3">Test validateOutput() with invalid JSON returns parse error</idea>
+      <idea ac="3,4">Test validateOutputWithRetry() - first attempt fails JSON parse, retry succeeds</idea>
+      <idea ac="3,4">Test validateOutputWithRetry() - first attempt fails schema validation, retry succeeds</idea>
+      <idea ac="5">Test retry prompt includes schema description and "PREVIOUS ATTEMPT FAILED VALIDATION"</idea>
+      <idea ac="6">Test validateOutputWithRetry() - both attempts fail returns OUTPUT_VALIDATION_FAILED</idea>
+      <idea ac="7">Test error response includes field-level issues array with path and message</idea>
+      <idea ac="8">Test successful validation returns typed output object (not raw string)</idea>
+      <idea ac="9">Test type coercion - string "123" coerced to number 123 in output</idea>
+      <idea ac="10">Test both LLM attempts are logged with prompt, response, and validation result</idea>
+      <idea ac="integration">Test full request flow - valid output returns 200 with data</idea>
+      <idea ac="integration">Test full request flow - invalid output triggers retry (mock LLM)</idea>
+      <idea ac="integration">Test full request flow - double failure returns 500</idea>
+    </ideas>
+  </tests>
+</story-context>

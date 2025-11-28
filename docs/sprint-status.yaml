@@ -71,7 +71,7 @@ development_status:
   # Epic 4: Schema Validation & Output (6 stories)
   epic-4: contexted
   4-1-input-schema-validation: done
-  4-2-output-schema-enforcement: backlog
+  4-2-output-schema-enforcement: done
   4-3-error-response-contract: backlog
   4-4-llm-unavailability-handling: backlog
   4-5-response-caching: backlog

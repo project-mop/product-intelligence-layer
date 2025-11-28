@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Loader2, BookOpen, Play, FileJson } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, FileText, Play, FileJson } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -178,14 +178,15 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
               processId={processId}
               isPublished={hasPublishedVersion}
             />
-            {/* API Docs link placeholder - Story 3.6 */}
+            {/* API Docs link - Story 3.6 AC: 1 */}
             <div className="mt-4 pt-4 border-t">
-              <Button variant="ghost" size="sm" disabled className="text-muted-foreground">
-                <BookOpen className="h-4 w-4 mr-2" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(`/dashboard/processes/${processId}/docs`)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
                 API Documentation
-                <Badge variant="outline" className="ml-2 text-xs">
-                  Coming Soon
-                </Badge>
               </Button>
             </div>
           </CardContent>

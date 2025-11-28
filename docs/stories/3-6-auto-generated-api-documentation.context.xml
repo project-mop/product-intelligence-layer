@@ -1,0 +1,118 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>6</storyId>
+    <title>Auto-Generated API Documentation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-6-auto-generated-api-documentation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer integrating the API</asA>
+    <iWant>auto-generated API documentation for each intelligence endpoint</iWant>
+    <soThat>I can integrate quickly without guessing the request/response formats</soThat>
+    <tasks>
+      <task id="1" ac="1,10">Create API Docs Page at src/app/dashboard/processes/[id]/docs/page.tsx</task>
+      <task id="2" ac="2,9">Create EndpointSection Component with copy functionality</task>
+      <task id="3" ac="3,9">Create AuthenticationSection Component with Bearer token display</task>
+      <task id="4" ac="4,5">Create SchemaSection Component reusing PropertyNode pattern</task>
+      <task id="5" ac="6,9">Create ExampleRequestSection Component with sample payload</task>
+      <task id="6" ac="7">Create ExampleResponseSection Component with mock response</task>
+      <task id="7" ac="8">Create ErrorCodesSection Component with error table</task>
+      <task id="8" ac="6,7,10">Add tRPC getDocs procedure (optional - may reuse existing get)</task>
+      <task id="9" ac="1-9">Write unit tests for all doc components</task>
+      <task id="10" ac="1,10">Write component integration tests</task>
+      <task id="11" ac="1-10">Verification - typecheck, lint, test, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Docs Page Access: API Docs page accessible from process detail page via "API Docs" button</criterion>
+    <criterion id="2">Endpoint URL Display: Shows complete endpoint URL with base domain</criterion>
+    <criterion id="3">Authentication Section: Clearly shows Bearer token auth method with example header</criterion>
+    <criterion id="4">Input Schema Display: Shows input schema with field names, types, required/optional, descriptions</criterion>
+    <criterion id="5">Output Schema Display: Shows output schema with field names, types, descriptions</criterion>
+    <criterion id="6">Example Request: Shows sample request payload auto-generated from input schema</criterion>
+    <criterion id="7">Example Response: Shows example success response (mock or last test response)</criterion>
+    <criterion id="8">Error Codes Section: Documents all error codes: 401, 403, 404, 500, 503</criterion>
+    <criterion id="9">Copy Functionality: Copy buttons for endpoint URL, sample request body, auth header</criterion>
+    <criterion id="10">Dynamic Updates: Documentation reflects current process schema</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Story 3.6: Auto-Generated API Documentation" snippet="Defines AC 1-10, API response formats, error codes, and component locations for auto-generated documentation page"/>
+      <doc path="docs/architecture.md" title="Architecture" section="Error Handling Matrix" snippet="Documents error types, HTTP status codes, and user messages: 401 UNAUTHORIZED, 403 FORBIDDEN, 404 NOT_FOUND, 429 RATE_LIMITED, 503 LLM_TIMEOUT/LLM_ERROR, 500 OUTPUT_VALIDATION_FAILED"/>
+      <doc path="docs/architecture.md" title="Architecture" section="API Contracts" snippet="Defines success response format: { success: true, data: {...}, meta: { version, cached, latency_ms, request_id } } and error format: { success: false, error: { code, message, details? } }"/>
+      <doc path="docs/architecture.md" title="Architecture" section="Public API Patterns" snippet="REST endpoints use /api/v1/ prefix, Bearer token authentication, rate limit headers"/>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy MVP" section="Test Types Overview" snippet="Unit tests in tests/unit/, component tests with Vitest + RTL, 90% coverage threshold"/>
+      <doc path="docs/stories/3-5-view-json-schema.md" title="Story 3.5 Reference" section="Dev Agent Record" snippet="Previous story learnings: SchemaViewer component, PropertyNode pattern, copy/download patterns, test patterns"/>
+    </docs>
+    <code>
+      <file path="src/components/process/SchemaViewer.tsx" kind="component" symbol="SchemaViewer, PropertyNode" lines="1-337" reason="REUSE: PropertyNode pattern for collapsible schema display with descriptions. Copy/download button patterns."/>
+      <file path="src/components/process/TestConsole.tsx" kind="component" symbol="TestConsole" lines="1-321" reason="REUSE: Sample payload generation pattern, syntax highlighting with react-syntax-highlighter, copy cURL pattern"/>
+      <file path="src/lib/schema/sample-generator.ts" kind="utility" symbol="generateSamplePayload" lines="1-237" reason="REUSE: Logic for generating sample values from JSON Schema (string→"example", number→0, boolean→true)"/>
+      <file path="src/lib/api/curl-generator.ts" kind="utility" symbol="generateCurlCommand" lines="*" reason="REUSE: cURL command generation pattern for copy functionality"/>
+      <file path="src/app/dashboard/processes/[id]/page.tsx" kind="page" symbol="ProcessDetailPage" lines="1-273" reason="MODIFY: Add "API Docs" button. Currently has placeholder at lines 181-190"/>
+      <file path="src/app/dashboard/processes/[id]/schema/page.tsx" kind="page" symbol="SchemaPage" lines="1-137" reason="PATTERN: Follow this page structure for docs page (header, loading, error states, content)"/>
+      <file path="src/server/api/routers/process.ts" kind="router" symbol="processRouter" lines="378-417" reason="REUSE: process.get procedure already returns inputSchema, outputSchema - may not need new getDocs procedure"/>
+      <file path="src/components/process/EndpointUrl.tsx" kind="component" symbol="EndpointUrl" lines="*" reason="REUSE: Endpoint URL display and copy pattern"/>
+      <file path="tests/unit/components/process/SchemaViewer.test.tsx" kind="test" symbol="SchemaViewer tests" lines="1-100" reason="PATTERN: Test patterns for component testing with renderWithProviders, clipboard mocking, URL mocking"/>
+    </code>
+    <dependencies>
+      <npm>
+        <package name="react-syntax-highlighter" version="^15.x" purpose="JSON syntax highlighting (already installed)"/>
+        <package name="lucide-react" version="*" purpose="Icons: Copy, Check, FileText, Key, AlertTriangle, etc. (already installed)"/>
+        <package name="sonner" version="*" purpose="Toast notifications for copy success (already installed)"/>
+      </npm>
+      <shadcn>
+        <component name="Card, CardContent, CardHeader, CardTitle" path="src/components/ui/card.tsx" installed="true"/>
+        <component name="Button" path="src/components/ui/button.tsx" installed="true"/>
+        <component name="Badge" path="src/components/ui/badge.tsx" installed="true"/>
+        <component name="Collapsible, CollapsibleContent, CollapsibleTrigger" path="src/components/ui/collapsible.tsx" installed="true"/>
+        <component name="Tooltip, TooltipContent, TooltipProvider, TooltipTrigger" path="src/components/ui/tooltip.tsx" installed="true"/>
+        <component name="Table, TableBody, TableCell, TableHead, TableHeader, TableRow" path="src/components/ui/table.tsx" installed="true"/>
+      </shadcn>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="ADR-003">Dashboard uses tRPC for internal operations, REST only for public customer-facing APIs</constraint>
+    <constraint source="architecture">All database queries must filter by tenantId from session context</constraint>
+    <constraint source="testing-strategy">50% coverage minimum for MVP, 90% threshold in CI</constraint>
+    <constraint source="story">No new tRPC procedure required if process.get already provides needed data</constraint>
+    <constraint source="story">Reuse patterns from Story 3.3 (TestConsole) and Story 3.5 (SchemaViewer)</constraint>
+    <constraint source="dev-notes">Test coverage patterns established in Story 3.5 with 26 unit tests for SchemaViewer</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Intelligence Generate Endpoint" kind="REST endpoint" signature="POST /api/v1/intelligence/:processId/generate" path="src/app/api/v1/intelligence/[processId]/generate/route.ts"/>
+    <interface name="IntelligenceResponse" kind="TypeScript type" signature="{ success: true, data: Record&lt;string, unknown&gt;, meta: { version: string, cached: boolean, latency_ms: number, request_id: string } }" path="docs/tech-spec-epic-3.md"/>
+    <interface name="IntelligenceErrorResponse" kind="TypeScript type" signature="{ success: false, error: { code: string, message: string, details?: Record&lt;string, unknown&gt; } }" path="docs/tech-spec-epic-3.md"/>
+    <interface name="process.get" kind="tRPC query" signature="input: { id: string }, returns: Process with versions, inputSchema, outputSchema" path="src/server/api/routers/process.ts:378-417"/>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with React Testing Library. Component tests use renderWithProviders from tests/support/render.tsx. Mock clipboard API and URL.createObjectURL for copy/download tests. Follow Arrange-Act-Assert pattern. Test both success and error states.
+    </standards>
+    <locations>
+      <location pattern="tests/unit/components/process/docs/*.test.tsx">New component unit tests</location>
+      <location pattern="tests/unit/components/process/">Existing component tests for reference</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test API Docs page loads with all sections rendered</idea>
+      <idea ac="2">Test EndpointSection renders correct URL format with processId</idea>
+      <idea ac="3">Test AuthenticationSection displays Bearer token format</idea>
+      <idea ac="4">Test SchemaSection renders input schema with PropertyNode pattern</idea>
+      <idea ac="5">Test SchemaSection renders output schema with field details</idea>
+      <idea ac="6">Test ExampleRequestSection generates sample payload from schema</idea>
+      <idea ac="7">Test ExampleResponseSection shows response structure with meta fields</idea>
+      <idea ac="8">Test ErrorCodesSection lists all 5 error codes with descriptions</idea>
+      <idea ac="9">Test copy buttons trigger clipboard API with correct content</idea>
+      <idea ac="10">Test documentation reflects schema changes when process updated</idea>
+    </ideas>
+  </tests>
+</story-context>

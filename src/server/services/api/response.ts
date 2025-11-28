@@ -128,6 +128,7 @@ export function createSuccessResponse<T>(
     headers: {
       "Content-Type": "application/json",
       "X-Request-Id": requestId,
+      "X-Cache": cached ? "HIT" : "MISS",
     },
   });
 }

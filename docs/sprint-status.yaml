@@ -74,7 +74,7 @@ development_status:
   4-2-output-schema-enforcement: done
   4-3-error-response-contract: done
   4-4-llm-unavailability-handling: done
-  4-5-response-caching: backlog
+  4-5-response-caching: done
   4-6-configurable-cache-ttl: backlog
   epic-4-retrospective: optional
 

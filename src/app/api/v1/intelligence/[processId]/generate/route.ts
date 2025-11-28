@@ -9,6 +9,7 @@
  * @see docs/tech-spec-epic-3.md#Story-3.2-LLM-Gateway-Integration
  * @see docs/architecture.md#Public-API-Patterns
  * @see docs/stories/4-3-error-response-contract.md
+ * @see docs/stories/4-5-response-caching.md
  */
 
 import { NextRequest } from "next/server";
@@ -33,6 +34,7 @@ import { AnthropicGateway } from "~/server/services/llm";
 import { ProcessEngine } from "~/server/services/process/engine";
 import type { ProcessConfig } from "~/server/services/process/types";
 import { getGatewayOverride } from "./testing";
+import { computeInputHash, getCacheService } from "~/server/services/cache";
 
 interface RouteParams {
   params: Promise<{
@@ -185,19 +187,55 @@ export async function POST(
 
   // Step 8: Get process config from version
   const config = activeVersion.config as unknown as ProcessConfig;
+  const validatedInput = (body as { input: Record<string, unknown> }).input;
 
-  // Step 9: Initialize ProcessEngine with LLM gateway
+  // Step 9: Cache lookup (Story 4.5)
+  // Check for Cache-Control: no-cache header to bypass cache
+  const cacheControlHeader = request.headers.get("Cache-Control");
+  const bypassCache = cacheControlHeader?.toLowerCase().includes("no-cache");
+  const cacheEnabled = config.cacheEnabled !== false; // Default to enabled
+
+  let inputHash: string | null = null;
+
+  if (cacheEnabled && !bypassCache) {
+    // Compute cache key: SHA256(tenantId + processId + sortedJSON(input))
+    inputHash = computeInputHash(
+      apiKeyContext.tenantId,
+      processId,
+      validatedInput
+    );
+
+    // Check cache before LLM call (before circuit breaker per Story 4.4 learnings)
+    const cacheService = getCacheService();
+    const cachedEntry = await cacheService.get(
+      apiKeyContext.tenantId,
+      processId,
+      inputHash
+    );
+
+    if (cachedEntry) {
+      // Cache HIT - return immediately, skip LLM call
+      return createSuccessResponse(
+        cachedEntry.data,
+        requestId,
+        startTime,
+        true // cached = true
+      );
+    }
+  }
+
+  // Step 10: Initialize ProcessEngine with LLM gateway
   const gateway = getGateway();
   const engine = new ProcessEngine(gateway);
 
-  // Step 10: Generate intelligence with output schema validation (Story 4.2)
+  // Step 11: Generate intelligence with output schema validation (Story 4.2)
   try {
     // Get outputSchema from process for validation
     const outputSchema = process.outputSchema as Record<string, unknown> | null;
 
     const result = await engine.generateIntelligence(
       config,
-      input as Record<string, unknown>,
+      validatedInput,
       outputSchema
         ? {
             outputSchema,
@@ -210,12 +248,34 @@ export async function POST(
         : undefined
     );
 
-    // Step 11: Return success response
+    // Step 12: Store in cache after successful LLM response (Story 4.5)
+    if (cacheEnabled && inputHash) {
+      const cacheService = getCacheService();
+      const ttlSeconds = config.cacheTtlSeconds ?? 900; // Default 15 min
+
+      // Cache write failures are silent per AC#9 (handled inside cacheService.set)
+      await cacheService.set(
+        apiKeyContext.tenantId,
+        processId,
+        inputHash,
+        {
+          data: result.data,
+          meta: {
+            version: activeVersion.version,
+            cachedAt: new Date().toISOString(),
+            inputHash,
+          },
+        },
+        ttlSeconds
+      );
+    }
+
+    // Step 13: Return success response with X-Cache: MISS
     return createSuccessResponse(
       result.data,
       requestId,
       startTime,
-      false // cached = false (Epic 5 implements caching)
+      false // cached = false (cache miss)
     );
   } catch (error) {
     // Use centralized error handler (Story 4.3)

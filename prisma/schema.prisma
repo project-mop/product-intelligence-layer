@@ -228,12 +228,14 @@ model CallLog {
 /// Response cache for idempotent requests
 model ResponseCache {
     id        String   @id @default(cuid())
-    tenantId  String
-    processId String
-    inputHash String // Cache key: SHA-256 of tenant + process + input
+    tenantId  String   @map("tenant_id")
+    processId String   @map("process_id")
+    inputHash String   @map("input_hash") // Cache key: SHA-256 of tenant + process + input
     response  Json // Cached response data
-    expiresAt DateTime
-    createdAt DateTime @default(now())
+    version   String // Process version at cache time
+    cachedAt  DateTime @default(now()) @map("cached_at")
+    expiresAt DateTime @map("expires_at")
+    createdAt DateTime @default(now()) @map("created_at")
 
     // Relations
     tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -241,7 +243,8 @@ model ResponseCache {
 
     @@unique([tenantId, processId, inputHash])
     @@index([expiresAt])
-    @@index([tenantId, processId, inputHash])
+    @@index([tenantId, processId])
+    @@map("response_cache")
 }
 
 // =============================================================================

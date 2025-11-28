@@ -1,0 +1,189 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>5</storyId>
+    <title>Response Caching</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-5-response-caching.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system</asA>
+    <iWant>to cache successful intelligence responses based on deterministic input hash</iWant>
+    <soThat>identical requests return instantly, reducing LLM costs and improving response times for repeated queries</soThat>
+    <tasks>
+      <task id="1" ac="1,6,7">Create ResponseCache Prisma Model - Add model to schema, add relations, run db push</task>
+      <task id="2" ac="2">Create Cache Hash Utility - Implement computeInputHash with deterministic sorted JSON</task>
+      <task id="3" ac="1,3,4,5,6,7,9">Create Cache Service Interface and Implementation - CacheService with get/set/invalidate, PostgresCacheService class</task>
+      <task id="4" ac="3,4,8">Integrate Cache Lookup in Intelligence API - Check cache before LLM, handle Cache-Control header, X-Cache headers</task>
+      <task id="5" ac="5,6,9">Integrate Cache Storage After LLM Response - Store after validation, silent failure handling, X-Cache: MISS header</task>
+      <task id="6" ac="5">Add ProcessConfig Cache Fields - Verify cacheTtlSeconds and cacheEnabled in ProcessConfig</task>
+      <task id="7" ac="2,10">Write Unit Tests for Cache Hash - Determinism, key ordering, nested objects, special chars</task>
+      <task id="8" ac="1,6,7,9">Write Unit Tests for Cache Service - Mocked Prisma, get/set/invalidate, tenant isolation, silent failures</task>
+      <task id="9" ac="1-10">Write Integration Tests for Caching - Full flow tests with real database</task>
+      <task id="10" ac="1-10">Verification - typecheck, lint, test:unit, test:integration, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Successful responses are cached in `response_cache` table</criterion>
+    <criterion id="2">Cache key is deterministic hash: SHA256(tenantId + processId + sortedJSON(input))</criterion>
+    <criterion id="3">Cache lookup occurs before LLM call (after input validation)</criterion>
+    <criterion id="4">Cache hit returns immediately with `meta.cached: true` and `X-Cache: HIT` header</criterion>
+    <criterion id="5">Cache miss proceeds to LLM, then stores result with TTL</criterion>
+    <criterion id="6">Cache entries include: response data, version, cachedAt timestamp, inputHash</criterion>
+    <criterion id="7">Cache is tenant-isolated (queries always filter by tenantId)</criterion>
+    <criterion id="8">`Cache-Control: no-cache` header bypasses cache lookup (forces fresh LLM call)</criterion>
+    <criterion id="9">Cache write failures are silent (response still returned to caller)</criterion>
+    <criterion id="10">Identical requests within TTL window return cached response (FR-512)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture" section="Intelligence Generation Flow">
+        Defines the cache lookup/store stages in the intelligence generation flow. Cache key computation: SHA256(tenantId + processId + sortedJSON(input)). ADR-001 specifies PostgreSQL-based caching for MVP.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Input Hash Calculation">
+        Provides the exact hash computation pattern: normalize JSON with sorted keys, concatenate tenantId:processId:normalized, SHA256 and truncate to 32 chars.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="ADR-001: PostgreSQL for Caching">
+        Documents the decision to use PostgreSQL for caching in MVP. Abstraction layer allows Redis upgrade later. Cleanup requires pg-boss job.
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Tech Spec" section="Story 4.5: Response Caching">
+        Authoritative acceptance criteria, cache flow diagram, and performance targets (cache hit < 50ms P95).
+      </doc>
+      <doc path="docs/tech-spec-epic-4.md" title="Epic 4 Tech Spec" section="Data Models and Contracts">
+        Prisma ResponseCache model definition and CacheEntry/CacheService TypeScript interfaces.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Types Overview">
+        Defines unit tests in tests/unit/, integration tests in tests/integration/, and the factory pattern for test data.
+      </doc>
+      <doc path="docs/stories/4-4-llm-unavailability-handling.md" title="Story 4.4" section="Dev Agent Record">
+        Previous story learnings: circuit breaker is at src/server/services/llm/circuit-breaker.ts, LLMError has retryAfter, singleton pattern in LLM gateway.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="prisma/schema.prisma" kind="schema" symbol="ResponseCache" lines="229-245" reason="ResponseCache model already exists - needs version and cachedAt fields added per AC#6">
+        Existing ResponseCache model with tenantId, processId, inputHash, response, expiresAt. Missing: version, cachedAt columns.
+      </artifact>
+      <artifact path="src/app/api/v1/intelligence/[processId]/generate/route.ts" kind="route" symbol="POST" lines="80-227" reason="Main endpoint to integrate cache lookup/store">
+        Intelligence generation endpoint. Currently returns cached=false. Needs: cache lookup after input validation, cache store after LLM success, X-Cache headers.
+      </artifact>
+      <artifact path="src/server/services/llm/circuit-breaker.ts" kind="service" symbol="CircuitBreaker" lines="1-255" reason="Cache lookup should occur BEFORE circuit breaker check per Story 4.4 learnings">
+        Circuit breaker implementation from Story 4.4. Cache service should follow same singleton pattern.
+      </artifact>
+      <artifact path="src/server/services/llm/anthropic.ts" kind="service" symbol="AnthropicGateway" reason="LLM gateway that cache service integrates with - cache hit skips LLM call">
+        Anthropic LLM gateway with circuit breaker integration.
+      </artifact>
+      <artifact path="src/server/middleware/error-handler.ts" kind="middleware" symbol="handleApiError" lines="163-184" reason="Error handler for API responses - cache write failures should not trigger this">
+        Centralized error handler. Cache write failures should be silent (try-catch, log, continue).
+      </artifact>
+      <artifact path="src/server/services/process/types.ts" kind="types" symbol="ProcessConfig" lines="13-46" reason="Contains cacheTtlSeconds and cacheEnabled fields (already defined)">
+        ProcessConfig interface with cacheTtlSeconds: number (default 900) and cacheEnabled: boolean (default true).
+      </artifact>
+      <artifact path="src/server/services/api/response.ts" kind="service" symbol="createSuccessResponse" reason="Needs to accept cached flag and set X-Cache header">
+        Response builder for success responses. Currently receives cached boolean parameter.
+      </artifact>
+      <artifact path="tests/integration/intelligence-api.test.ts" kind="test" reason="Add Story 4.5 describe block for caching integration tests">
+        Existing integration tests for intelligence API. Has Story 4.4 tests as reference pattern.
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="npm">
+        <package name="crypto" version="builtin" purpose="Node.js built-in for SHA256 hashing" />
+        <package name="@prisma/client" version="^7.0.1" purpose="Database access for cache table" />
+        <package name="zod" version="^3.24.2" purpose="Schema validation (already used)" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture">Cache key includes tenantId for tenant isolation - queries always filter by tenantId</constraint>
+    <constraint source="architecture">Cache entries stored with TTL from ProcessConfig.cacheTtlSeconds (default 900)</constraint>
+    <constraint source="architecture">Cache write failures are silent - response still returned to caller</constraint>
+    <constraint source="tech-spec">Cache hit response time target: &lt; 50ms P95</constraint>
+    <constraint source="tech-spec">PostgreSQL-based cache per ADR-001 (adequate for MVP scale)</constraint>
+    <constraint source="story-4.4">Cache lookup should occur BEFORE circuit breaker check to avoid unnecessary failures</constraint>
+    <constraint source="story-4.4">If cache hit, skip both circuit breaker check and LLM call</constraint>
+    <constraint source="dev-notes">Use singleton pattern for cache service (consistent with LLM gateway pattern)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="CacheService" kind="TypeScript interface" path="src/server/services/cache/types.ts">
+      <signature>
+interface CacheEntry {
+  data: Record&lt;string, unknown&gt;;
+  meta: {
+    version: string;
+    cachedAt: string; // ISO timestamp
+    inputHash: string;
+  };
+}
+
+interface CacheService {
+  get(tenantId: string, processId: string, inputHash: string): Promise&lt;CacheEntry | null&gt;;
+  set(tenantId: string, processId: string, inputHash: string, entry: CacheEntry, ttlSeconds: number): Promise&lt;void&gt;;
+  invalidate(tenantId: string, processId: string): Promise&lt;void&gt;;
+}
+      </signature>
+    </interface>
+    <interface name="computeInputHash" kind="function" path="src/server/services/cache/hash.ts">
+      <signature>
+function computeInputHash(
+  tenantId: string,
+  processId: string,
+  input: Record&lt;string, unknown&gt;
+): string
+// Returns SHA256 hash truncated to 32 chars
+      </signature>
+    </interface>
+    <interface name="POST /api/v1/intelligence/:processId/generate" kind="REST endpoint" path="src/app/api/v1/intelligence/[processId]/generate/route.ts">
+      <signature>
+Headers (Request):
+- Authorization: Bearer pil_live_... or pil_test_...
+- Cache-Control: no-cache (optional, bypasses cache)
+
+Headers (Response):
+- X-Request-Id: req_*
+- X-Cache: HIT or MISS
+
+Response Body:
+{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "version": "1.0.0",
+    "cached": true/false,
+    "latency_ms": number,
+    "request_id": "req_*"
+  }
+}
+      </signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with mocked Prisma client. Integration tests use real PostgreSQL test database with automatic cleanup between tests. Mock Date.now() for TTL/expiration tests. Follow AAA pattern (Arrange-Act-Assert). 50% minimum coverage for MVP. Use factory pattern for test data (tenantFactory, processFactory, etc.).
+    </standards>
+    <locations>
+      <location>tests/unit/server/services/cache/hash.test.ts</location>
+      <location>tests/unit/server/services/cache/service.test.ts</location>
+      <location>tests/integration/intelligence-api.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="2">Test computeInputHash produces identical output for same inputs with different key ordering</idea>
+      <idea ac="2">Test computeInputHash produces different output for different tenantId/processId</idea>
+      <idea ac="2">Test computeInputHash handles nested objects and arrays correctly</idea>
+      <idea ac="3,4">Test cache lookup returns cached response with meta.cached=true and X-Cache: HIT header</idea>
+      <idea ac="3,5">Test cache miss proceeds to LLM, stores result, returns X-Cache: MISS header</idea>
+      <idea ac="7">Test cache queries always filter by tenantId (tenant A cannot hit tenant B's cache)</idea>
+      <idea ac="8">Test Cache-Control: no-cache header bypasses cache lookup</idea>
+      <idea ac="9">Test cache write failure does not affect response to caller</idea>
+      <idea ac="10">Test identical requests within TTL return same cached response</idea>
+      <idea ac="1,6">Test cache entry includes response data, version, cachedAt, inputHash</idea>
+    </ideas>
+  </tests>
+</story-context>

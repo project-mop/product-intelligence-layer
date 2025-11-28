@@ -33,12 +33,13 @@ export const testDb = new PrismaClient({
 /**
  * Tables available for truncation.
  * Order matters due to foreign key constraints - truncate children before parents.
+ * NOTE: Use actual PostgreSQL table names (after @@map directives) not Prisma model names.
  */
 export const TRUNCATABLE_TABLES = [
   // Children first (no FK references to them)
   "AuditLog",
   "RateLimit",
-  "ResponseCache",
+  "response_cache", // @@map("response_cache") in schema
   "CallLog",
   "ApiKey",
   "ProcessVersion",
@@ -73,11 +74,12 @@ export type TruncatableTable = (typeof TRUNCATABLE_TABLES)[number];
 export async function resetDatabase(): Promise<void> {
   // Use raw SQL for faster truncation with CASCADE
   // This handles foreign key constraints automatically
+  // NOTE: Use actual PostgreSQL table names (after @@map directives) not Prisma model names
   await testDb.$executeRawUnsafe(`
     TRUNCATE TABLE
       "AuditLog",
       "RateLimit",
-      "ResponseCache",
+      "response_cache",
       "CallLog",
       "ApiKey",
       "ProcessVersion",

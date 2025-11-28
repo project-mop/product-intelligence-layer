@@ -2961,3 +2961,657 @@ describe("Story 4.4: LLM Unavailability Handling", () => {
     });
   });
 });
+
+/**
+ * Story 4.5: Response Caching Tests
+ *
+ * Tests caching behavior for intelligence responses:
+ * - Cache miss stores response and returns X-Cache: MISS
+ * - Cache hit returns cached response with X-Cache: HIT and meta.cached: true
+ * - Cache-Control: no-cache bypasses cache lookup
+ * - Cache is tenant-isolated (tenant A can't hit tenant B's cache)
+ * - Identical requests within TTL return same cached response
+ * - Different inputs produce different cache keys
+ *
+ * @see docs/stories/4-5-response-caching.md
+ */
+describe("Story 4.5: Response Caching", () => {
+  /**
+   * Helper to create a mock gateway for caching tests.
+   */
+  function createMockGateway45(
+    handler: (params: GenerateParams) => Promise<GenerateResult>
+  ): LLMGateway {
+    return {
+      generate: vi.fn(handler),
+    };
+  }
+
+  beforeEach(() => {
+    setGatewayOverride(null);
+  });
+
+  afterEach(() => {
+    setGatewayOverride(null);
+  });
+
+  describe("Cache Miss Flow (AC: 1, 5, 6)", () => {
+    it("should return X-Cache: MISS header on first request", async () => {
+      const mockGateway = createMockGateway45(async () => ({
+        text: JSON.stringify({ result: "Fresh response" }),
+        usage: { inputTokens: 10, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "Widget" } }, // Matches default inputSchema
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("X-Cache")).toBe("MISS");
+
+      const body = await response.json();
+      expect(body.success).toBe(true);
+      expect(body.meta.cached).toBe(false);
+    });
+
+    it("should store response in cache after LLM call", async () => {
+      const mockGateway = createMockGateway45(async () => ({
+        text: JSON.stringify({ result: "Cached data" }),
+        usage: { inputTokens: 10, outputTokens: 20 },
+        model: "claude-3-haiku",
+        durationMs: 100,
+      }));
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const requestInput = { input: "CacheTest" }; // Matches default inputSchema
+
+      // First request - cache miss
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: requestInput },
+        }
+      );
+
+      const response1 = await generateHandler(request1, createParams(process.id));
+      expect(response1.status).toBe(200);
+      expect(response1.headers.get("X-Cache")).toBe("MISS");
+
+      // Verify LLM was called once
+      expect(mockGateway.generate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Cache Hit Flow (AC: 3, 4, 10)", () => {
+    it("should return X-Cache: HIT header on subsequent identical request", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Response ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const requestInput = { input: "CacheHitTest" }; // Matches default inputSchema
+
+      // First request - cache miss
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: requestInput },
+        }
+      );
+
+      const response1 = await generateHandler(request1, createParams(process.id));
+      expect(response1.status).toBe(200);
+      expect(response1.headers.get("X-Cache")).toBe("MISS");
+      const body1 = await response1.json();
+      expect(body1.meta.cached).toBe(false);
+
+      // Second request - should be cache hit
+      const request2 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: requestInput },
+        }
+      );
+
+      const response2 = await generateHandler(request2, createParams(process.id));
+      expect(response2.status).toBe(200);
+      expect(response2.headers.get("X-Cache")).toBe("HIT");
+
+      const body2 = await response2.json();
+      expect(body2.success).toBe(true);
+      expect(body2.meta.cached).toBe(true);
+      // Should return the same data as first request
+      expect(body2.data).toEqual(body1.data);
+
+      // LLM should only be called once (cache hit skipped second call)
+      expect(mockGateway.generate).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return cached response within TTL window (AC: 10)", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Generated ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900, // 15 min TTL
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const requestInput = { input: "TTLTest" }; // Matches default inputSchema
+
+      // Make 3 identical requests
+      for (let i = 0; i < 3; i++) {
+        const request = createRequest(
+          `/api/v1/intelligence/${process.id}/generate`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${plainTextKey}`,
+            },
+            body: { input: requestInput },
+          }
+        );
+
+        const response = await generateHandler(request, createParams(process.id));
+        expect(response.status).toBe(200);
+      }
+
+      // Only the first request should have called the LLM
+      expect(mockGateway.generate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Cache-Control: no-cache (AC: 8)", () => {
+    it("should bypass cache when Cache-Control: no-cache header is present", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Fresh ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const requestInput = { input: "BypassTest" }; // Matches default inputSchema
+
+      // First request - cache miss, stores in cache
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: requestInput },
+        }
+      );
+
+      const response1 = await generateHandler(request1, createParams(process.id));
+      expect(response1.status).toBe(200);
+      expect(response1.headers.get("X-Cache")).toBe("MISS");
+
+      // Second request with Cache-Control: no-cache - should bypass cache
+      const request2 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+            "Cache-Control": "no-cache",
+          },
+          body: { input: requestInput },
+        }
+      );
+
+      const response2 = await generateHandler(request2, createParams(process.id));
+      expect(response2.status).toBe(200);
+      // Should be MISS because we bypassed cache
+      expect(response2.headers.get("X-Cache")).toBe("MISS");
+
+      const body2 = await response2.json();
+      expect(body2.meta.cached).toBe(false);
+
+      // LLM should have been called twice (bypass means fresh call)
+      expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Tenant Isolation (AC: 7)", () => {
+    it("should not share cache between tenants", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Response ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      // Create two tenants with identical processes
+      const tenantA = await tenantFactory.create();
+      const tenantB = await tenantFactory.create();
+
+      const processA = await processFactory.create({
+        tenantId: tenantA.id,
+        outputSchema: null, // Skip output validation
+      });
+      const processB = await processFactory.create({
+        tenantId: tenantB.id,
+        outputSchema: null, // Skip output validation
+      });
+
+      await processVersionFactory.create({
+        processId: processA.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      await processVersionFactory.create({
+        processId: processB.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+
+      const { plainTextKey: keyA } = await apiKeyFactory.create({
+        tenantId: tenantA.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+      const { plainTextKey: keyB } = await apiKeyFactory.create({
+        tenantId: tenantB.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const sameInput = { input: "IsolationTest" }; // Matches default inputSchema
+
+      // Tenant A makes a request
+      const requestA = createRequest(
+        `/api/v1/intelligence/${processA.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${keyA}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      const responseA = await generateHandler(requestA, createParams(processA.id));
+      expect(responseA.status).toBe(200);
+      expect(responseA.headers.get("X-Cache")).toBe("MISS");
+
+      // Tenant B makes same request - should NOT hit A's cache
+      const requestB = createRequest(
+        `/api/v1/intelligence/${processB.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${keyB}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      const responseB = await generateHandler(requestB, createParams(processB.id));
+      expect(responseB.status).toBe(200);
+      // Should be MISS because tenant B has separate cache
+      expect(responseB.headers.get("X-Cache")).toBe("MISS");
+
+      // LLM should have been called twice (once per tenant)
+      expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Different Inputs (AC: 2)", () => {
+    it("should produce different cache keys for different inputs", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Response ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      // First request
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "Widget A" } }, // Matches default inputSchema
+        }
+      );
+
+      const response1 = await generateHandler(request1, createParams(process.id));
+      expect(response1.headers.get("X-Cache")).toBe("MISS");
+
+      // Second request with different input - should be cache miss
+      const request2 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { input: "Widget B" } }, // Matches default inputSchema
+        }
+      );
+
+      const response2 = await generateHandler(request2, createParams(process.id));
+      expect(response2.headers.get("X-Cache")).toBe("MISS");
+
+      // LLM should have been called twice (different inputs)
+      expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Cache Disabled (AC: 5)", () => {
+    it("should skip caching when cacheEnabled is false", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Response ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: false, // Caching disabled
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const sameInput = { input: "NoCacheTest" }; // Matches default inputSchema
+
+      // First request
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      await generateHandler(request1, createParams(process.id));
+
+      // Second request with same input
+      const request2 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      await generateHandler(request2, createParams(process.id));
+
+      // LLM should be called twice because caching is disabled
+      expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+    });
+  });
+});

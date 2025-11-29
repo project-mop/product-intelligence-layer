@@ -5,6 +5,9 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  // Instrumentation is enabled by default in Next.js 15+
+  // The instrumentation.ts file in src/ will be automatically loaded
+};
 
 export default config;

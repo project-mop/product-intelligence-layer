@@ -1,0 +1,224 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>6</storyId>
+    <title>Configurable Cache TTL</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-6-configurable-cache-ttl.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to configure the cache TTL for each intelligence process</iWant>
+    <soThat>I can balance freshness vs. cost for my use case, choosing faster cached responses when data changes infrequently or always-fresh responses when data changes frequently</soThat>
+    <tasks>
+      <task id="1" acs="1,2,3">Add Cache TTL Configuration to ProcessConfig Type</task>
+      <task id="2" acs="3,5">Add Zod Validation Schema for Cache TTL</task>
+      <task id="3" acs="1,5">Update Process tRPC Router for Cache Config</task>
+      <task id="4" acs="6">Create Cache TTL UI Component</task>
+      <task id="5" acs="6">Integrate Cache Settings into Process Form</task>
+      <task id="6" acs="1,4,7">Update Cache Service to Use Process TTL</task>
+      <task id="7" acs="8,9">Create pg-boss Cache Cleanup Job</task>
+      <task id="8" acs="10">Implement Cache Invalidation on Process Update/Delete</task>
+      <task id="9" acs="2">Add Environment Variable for Default TTL</task>
+      <task id="10" acs="3,5">Write Unit Tests for TTL Validation</task>
+      <task id="11" acs="8,9">Write Unit Tests for Cache Cleanup Job</task>
+      <task id="12" acs="1-10">Write Integration Tests for Cache TTL</task>
+      <task id="13" acs="1,5">Write Integration Tests for Process Router Cache Config</task>
+      <task id="14" acs="1-10">Verification</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Each process has configurable cacheTtlSeconds in ProcessVersion.config</criterion>
+    <criterion id="2">Default TTL is 900 seconds (15 minutes) per FR-513</criterion>
+    <criterion id="3">TTL range is 0 to 86400 seconds (0 = disabled, max = 24 hours)</criterion>
+    <criterion id="4">Setting TTL to 0 disables caching for that process</criterion>
+    <criterion id="5">TTL is validated on process save (reject values outside range)</criterion>
+    <criterion id="6">Cache TTL is displayed in process settings UI</criterion>
+    <criterion id="7">Changing TTL does not invalidate existing cache entries (they expire naturally)</criterion>
+    <criterion id="8">pg-boss job runs hourly to delete expired cache entries</criterion>
+    <criterion id="9">Cache cleanup job logs number of entries deleted per run</criterion>
+    <criterion id="10">Process update/delete invalidates all cache entries for that process</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Story 4.6: Configurable Cache TTL</section>
+        <snippet>Defines TTL range 0-86400, default 900s, pg-boss cleanup job hourly, cache invalidation on process update/delete. ProcessConfig includes cacheTtlSeconds and cacheEnabled fields.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>ADR-001: PostgreSQL for Caching, ADR-004: pg-boss</section>
+        <snippet>PostgreSQL-based caching with abstraction for Redis upgrade. pg-boss for background jobs using same PostgreSQL database - tables auto-created on boss.start().</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Test Types Overview</section>
+        <snippet>Unit tests use Vitest with mocked dependencies. Integration tests use real PostgreSQL. 90% coverage threshold. Factories available for Tenant, User, Process, ProcessVersion.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-5-response-caching.md</path>
+        <title>Story 4.5: Response Caching</title>
+        <section>Dev Notes - Learnings</section>
+        <snippet>Cache service created with get/set/invalidate methods. PostgresCacheService singleton pattern. Hash utility for deterministic input hashing. ProcessConfig already includes cacheTtlSeconds and cacheEnabled.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/server/services/cache/service.ts</path>
+        <kind>service</kind>
+        <symbol>PostgresCacheService</symbol>
+        <lines>1-172</lines>
+        <reason>Cache service with get/set/invalidate methods. Uses singleton pattern. Already accepts ttlSeconds parameter in set(). Story 4.6 uses existing invalidate() for process update/delete.</reason>
+      </file>
+      <file>
+        <path>src/server/services/cache/types.ts</path>
+        <kind>types</kind>
+        <symbol>CacheService, CacheEntry</symbol>
+        <lines>1-83</lines>
+        <reason>CacheService interface and CacheEntry type. Already defined - no changes needed for Story 4.6.</reason>
+      </file>
+      <file>
+        <path>src/server/services/process/types.ts</path>
+        <kind>types</kind>
+        <symbol>ProcessConfig, DEFAULT_PROCESS_CONFIG</symbol>
+        <lines>1-95</lines>
+        <reason>ProcessConfig already includes cacheTtlSeconds (default 900) and cacheEnabled (default true). DEFAULT_PROCESS_CONFIG provides defaults. No type changes needed.</reason>
+      </file>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>processRouter, processConfigInputSchema</symbol>
+        <lines>119-156</lines>
+        <reason>Already has cacheTtlSeconds and cacheEnabled in processConfigInputSchema. Create/update mutations already handle cache config. Needs: TTL range validation (0-86400), cache invalidation on update/delete.</reason>
+      </file>
+      <file>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>route</kind>
+        <symbol>POST</symbol>
+        <lines>192-271</lines>
+        <reason>Cache lookup/store logic already implemented. Uses config.cacheTtlSeconds with 900 default. Respects config.cacheEnabled flag. No changes needed for Story 4.6.</reason>
+      </file>
+      <file>
+        <path>src/env.js</path>
+        <kind>config</kind>
+        <symbol>env</symbol>
+        <lines>1-80</lines>
+        <reason>Environment variable validation. Story 4.6 adds CACHE_DEFAULT_TTL_SECONDS. Follow existing pattern for optional number with z.coerce.number().optional().</reason>
+      </file>
+      <file>
+        <path>tests/unit/server/services/cache/service.test.ts</path>
+        <kind>test</kind>
+        <symbol>PostgresCacheService tests</symbol>
+        <reason>Existing cache service unit tests. Story 4.6 adds tests for TTL=0 behavior, cleanup job, and invalidation.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>pg-boss</package>
+        <version>^12.3.0</version>
+        <purpose>PostgreSQL-based job queue for hourly cache cleanup. NEW - must install.</purpose>
+      </node>
+      <package>@prisma/client</package>
+      <package>zod</package>
+      <package>vitest</package>
+      <package>next</package>
+      <package>@trpc/server</package>
+      <internal>
+        <dep>src/server/services/cache/</dep>
+        <dep>src/server/services/process/types.ts</dep>
+        <dep>src/server/api/routers/process.ts</dep>
+        <dep>src/lib/logger.ts</dep>
+      </internal>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Use pg-boss for scheduled jobs per ADR-004 - PostgreSQL-based, no additional infrastructure</constraint>
+    <constraint type="pattern">TTL stored in ProcessVersion.config JSON column (existing pattern)</constraint>
+    <constraint type="pattern">Cache invalidation on process update/delete uses existing cacheService.invalidate()</constraint>
+    <constraint type="pattern">Singleton pattern for services (see getCacheService())</constraint>
+    <constraint type="validation">TTL range: 0 (disabled) to 86400 (24 hours)</constraint>
+    <constraint type="validation">Default TTL: 900 seconds (15 minutes) per FR-513</constraint>
+    <constraint type="security">Cache write/invalidation failures should be silent (log error, don't block response)</constraint>
+    <constraint type="testing">50% coverage minimum for MVP; unit tests for validation, integration for full flow</constraint>
+    <constraint type="testing">Mock pg-boss for unit tests, use real/skip for integration</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CacheService.invalidate</name>
+      <kind>function</kind>
+      <signature>invalidate(tenantId: string, processId: string): Promise&lt;void&gt;</signature>
+      <path>src/server/services/cache/service.ts</path>
+    </interface>
+    <interface>
+      <name>CacheService.set</name>
+      <kind>function</kind>
+      <signature>set(tenantId: string, processId: string, inputHash: string, entry: CacheEntry, ttlSeconds: number): Promise&lt;void&gt;</signature>
+      <path>src/server/services/cache/service.ts</path>
+    </interface>
+    <interface>
+      <name>processRouter.create</name>
+      <kind>tRPC mutation</kind>
+      <signature>create(input: { name, description?, inputSchema, outputSchema, config?: ProcessConfigInput })</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>processRouter.update</name>
+      <kind>tRPC mutation</kind>
+      <signature>update(input: { id, name?, description?, inputSchema?, outputSchema? })</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>processRouter.delete</name>
+      <kind>tRPC mutation</kind>
+      <signature>delete(input: { id })</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+    <interface>
+      <name>ProcessConfig.cacheTtlSeconds</name>
+      <kind>type field</kind>
+      <signature>cacheTtlSeconds: number // Default: 900, Range: 0-86400</signature>
+      <path>src/server/services/process/types.ts</path>
+    </interface>
+    <interface>
+      <name>ProcessConfig.cacheEnabled</name>
+      <kind>type field</kind>
+      <signature>cacheEnabled: boolean // Default: true</signature>
+      <path>src/server/services/process/types.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests with Vitest in tests/unit/, integration tests in tests/integration/. Use factories for test data (tenantFactory, userFactory, processFactory, processVersionFactory). Mock external dependencies including pg-boss. Mock Date.now() for expiration tests. 90% coverage threshold enforced. Arrange-Act-Assert pattern. Test edge cases: TTL=0, TTL=86400, invalid values.
+    </standards>
+    <locations>
+      <location>tests/unit/server/services/process/cache-config.test.ts</location>
+      <location>tests/unit/server/jobs/cache-cleanup.test.ts</location>
+      <location>tests/integration/intelligence-api.test.ts</location>
+      <location>tests/integration/process-router.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="3,5">Test TTL validation: valid values (0, 1, 900, 86400), invalid values (-1, 86401, NaN)</idea>
+      <idea ac="2">Test default TTL (900) applied when not provided</idea>
+      <idea ac="4">Test TTL=0 completely skips caching (both lookup and store)</idea>
+      <idea ac="1">Test custom TTL is used in cache.set() calls</idea>
+      <idea ac="7">Test changing TTL does not call invalidate() on existing entries</idea>
+      <idea ac="10">Test process.update triggers cacheService.invalidate()</idea>
+      <idea ac="10">Test process.delete triggers cacheService.invalidate()</idea>
+      <idea ac="8">Test cleanup job deletes only expired entries (mock Date)</idea>
+      <idea ac="9">Test cleanup job logs count of deleted entries</idea>
+      <idea ac="8">Test pg-boss schedule is '0 * * * *' (hourly)</idea>
+    </ideas>
+  </tests>
+</story-context>

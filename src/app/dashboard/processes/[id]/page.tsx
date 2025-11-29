@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Loader2, FileText, Play, FileJson } from "lucide-react";
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { EndpointUrl } from "~/components/process/EndpointUrl";
+import { CacheTtlSettings } from "~/components/process/CacheTtlSettings";
+import { DEFAULT_PROCESS_CONFIG } from "~/server/services/process/types";
 
 function formatDate(date: Date | null): string {
   if (!date) return "Never";
@@ -47,6 +49,25 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
     isLoading,
     error,
   } = api.process.get.useQuery({ id: processId });
+
+  // Mutation for updating cache settings - must be before any early returns
+  const utils = api.useUtils();
+  const updateVersionConfig = api.process.updateVersionConfig.useMutation({
+    onSuccess: () => {
+      void utils.process.get.invalidate({ id: processId });
+    },
+  });
+
+  // Handle cache settings change
+  const handleCacheSettingsChange = useCallback(
+    (config: { cacheTtlSeconds: number; cacheEnabled: boolean }) => {
+      updateVersionConfig.mutate({
+        processId,
+        config,
+      });
+    },
+    [processId, updateVersionConfig]
+  );
 
   // Loading state
   if (isLoading) {
@@ -107,6 +128,15 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
   const hasPublishedVersion = process.versions.some(
     (v) => v.environment === "SANDBOX" || v.environment === "PRODUCTION"
   );
+
+  // Get cache settings from latest version config
+  const latestVersion = process.versions[0];
+  const versionConfig = (latestVersion?.config ?? {}) as {
+    cacheTtlSeconds?: number;
+    cacheEnabled?: boolean;
+  };
+  const cacheTtlSeconds = versionConfig.cacheTtlSeconds ?? DEFAULT_PROCESS_CONFIG.cacheTtlSeconds;
+  const cacheEnabled = versionConfig.cacheEnabled ?? DEFAULT_PROCESS_CONFIG.cacheEnabled;
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -216,6 +246,26 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
                 <p className="text-foreground">{formatDate(process.updatedAt)}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Cache Settings - Story 4.6 AC: 6 */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Cache Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CacheTtlSettings
+              cacheTtlSeconds={cacheTtlSeconds}
+              cacheEnabled={cacheEnabled}
+              onChange={handleCacheSettingsChange}
+              disabled={updateVersionConfig.isPending}
+            />
+            {updateVersionConfig.error && (
+              <p className="mt-2 text-sm text-destructive">
+                Failed to update cache settings: {updateVersionConfig.error.message}
+              </p>
+            )}
           </CardContent>
         </Card>
 

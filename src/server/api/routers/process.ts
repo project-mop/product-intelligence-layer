@@ -23,6 +23,8 @@ import { AnthropicGateway } from "~/server/services/llm/anthropic";
 import { LLMError } from "~/server/services/llm/types";
 import { getTestGatewayOverride } from "./process.testing";
 import { computeProcessStatus } from "~/lib/process/status";
+import { getCacheService } from "~/server/services/cache";
+import { logger } from "~/lib/logger";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -127,7 +129,12 @@ const processConfigInputSchema = z
     outputSchemaDescription: z.string().min(1),
     goal: z.string().min(1),
     components: z.array(componentSchema).optional(),
-    cacheTtlSeconds: z.number().int().nonnegative().optional(),
+    cacheTtlSeconds: z
+      .number()
+      .int()
+      .min(0, "Cache TTL must be at least 0 (disabled)")
+      .max(86400, "Cache TTL cannot exceed 24 hours (86400 seconds)")
+      .optional(),
     cacheEnabled: z.boolean().optional(),
     requestsPerMinute: z.number().int().positive().optional(),
   })
@@ -553,6 +560,18 @@ export const processRouter = createTRPCRouter({
         data: updateData,
       });
 
+      // Invalidate cache entries for this process (Story 4.6 AC: 10)
+      // Fire-and-forget - cache invalidation failure shouldn't block the update
+      const cacheService = getCacheService();
+      void cacheService.invalidate(tenantId, input.id).then(() => {
+        logger.info("[process.update] Cache invalidated", { processId: input.id });
+      }).catch((error) => {
+        logger.error("[process.update] Failed to invalidate cache", {
+          processId: input.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
       // Log audit event (fire-and-forget)
       const requestContext = extractRequestContext(ctx.headers);
       void createAuditLog({
@@ -694,6 +713,18 @@ export const processRouter = createTRPCRouter({
       await db.process.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
+      });
+
+      // Invalidate cache entries for this process (Story 4.6 AC: 10)
+      // Fire-and-forget - cache invalidation failure shouldn't block the delete
+      const cacheService = getCacheService();
+      void cacheService.invalidate(tenantId, input.id).then(() => {
+        logger.info("[process.delete] Cache invalidated", { processId: input.id });
+      }).catch((error) => {
+        logger.error("[process.delete] Failed to invalidate cache", {
+          processId: input.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
 
       // Log audit event (fire-and-forget)
@@ -1027,5 +1058,107 @@ export const processRouter = createTRPCRouter({
           message: error instanceof Error ? error.message : "Unknown error occurred",
         });
       }
+    }),
+
+  /**
+   * Update version config (cache settings, etc.).
+   *
+   * Story 4.6 AC: 1, 5 - Update cacheTtlSeconds and cacheEnabled in version config.
+   * TTL range is validated: 0 (disabled) to 86400 (24 hours).
+   */
+  updateVersionConfig: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        config: z.object({
+          cacheTtlSeconds: z
+            .number()
+            .int()
+            .min(0, "Cache TTL must be at least 0 (disabled)")
+            .max(86400, "Cache TTL cannot exceed 24 hours (86400 seconds)")
+            .optional(),
+          cacheEnabled: z.boolean().optional(),
+        }),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Load process with latest version
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+        include: {
+          versions: {
+            where: { environment: "SANDBOX" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Get the SANDBOX version to update
+      const version = process.versions[0];
+      if (!version) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Process has no sandbox version to update",
+        });
+      }
+
+      // Merge config updates with existing config
+      const existingConfig = version.config as Record<string, unknown>;
+      const updatedConfig = {
+        ...existingConfig,
+        ...(input.config.cacheTtlSeconds !== undefined && {
+          cacheTtlSeconds: input.config.cacheTtlSeconds,
+        }),
+        ...(input.config.cacheEnabled !== undefined && {
+          cacheEnabled: input.config.cacheEnabled,
+        }),
+      };
+
+      // Update the version config
+      const updatedVersion = await db.processVersion.update({
+        where: { id: version.id },
+        data: {
+          config: updatedConfig as Prisma.InputJsonValue,
+        },
+      });
+
+      // Log audit event (fire-and-forget)
+      const requestContext = extractRequestContext(ctx.headers);
+      void createAuditLog({
+        tenantId,
+        userId: ctx.session.user.id,
+        action: "processVersion.configUpdated",
+        resource: "processVersion",
+        resourceId: version.id,
+        metadata: {
+          processId: input.processId,
+          updatedFields: Object.keys(input.config),
+        },
+        ipAddress: requestContext.ipAddress,
+        userAgent: requestContext.userAgent,
+      });
+
+      return updatedVersion;
     }),
 });

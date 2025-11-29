@@ -3614,4 +3614,81 @@ describe("Story 4.5: Response Caching", () => {
       expect(mockGateway.generate).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("Story 4.6: TTL=0 Disables Caching (AC: 4)", () => {
+    it("should skip caching when cacheTtlSeconds is 0", async () => {
+      let callCount = 0;
+      const mockGateway = createMockGateway45(async () => {
+        callCount++;
+        return {
+          text: JSON.stringify({ result: `Response ${callCount}` }),
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: "claude-3-haiku",
+          durationMs: 100,
+        };
+      });
+      setGatewayOverride(mockGateway);
+
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        outputSchema: null, // Skip output validation
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 0, // TTL=0 disables caching
+          cacheEnabled: true, // Even with cacheEnabled=true
+          requestsPerMinute: 60,
+        },
+      });
+      const { plainTextKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        scopes: ["process:*"],
+        environment: "PRODUCTION",
+      });
+
+      const sameInput = { input: "TTLZeroTest" };
+
+      // First request
+      const request1 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      await generateHandler(request1, createParams(process.id));
+
+      // Second request with same input
+      const request2 = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: sameInput },
+        }
+      );
+
+      await generateHandler(request2, createParams(process.id));
+
+      // LLM should be called twice because TTL=0 disables caching
+      expect(mockGateway.generate).toHaveBeenCalledTimes(2);
+    });
+  });
 });

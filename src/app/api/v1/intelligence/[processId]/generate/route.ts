@@ -189,11 +189,13 @@ export async function POST(
   const config = activeVersion.config as unknown as ProcessConfig;
   const validatedInput = (body as { input: Record<string, unknown> }).input;
 
-  // Step 9: Cache lookup (Story 4.5)
+  // Step 9: Cache lookup (Story 4.5, 4.6)
   // Check for Cache-Control: no-cache header to bypass cache
   const cacheControlHeader = request.headers.get("Cache-Control");
   const bypassCache = cacheControlHeader?.toLowerCase().includes("no-cache");
-  const cacheEnabled = config.cacheEnabled !== false; // Default to enabled
+  // Cache is enabled if: cacheEnabled !== false AND cacheTtlSeconds > 0 (Story 4.6 AC: 4)
+  const ttlSeconds = config.cacheTtlSeconds ?? 900; // Default 15 min
+  const cacheEnabled = config.cacheEnabled !== false && ttlSeconds > 0;
 
   let inputHash: string | null = null;
 
@@ -251,7 +253,7 @@ export async function POST(
     // Step 12: Store in cache after successful LLM response (Story 4.5)
     if (cacheEnabled && inputHash) {
       const cacheService = getCacheService();
-      const ttlSeconds = config.cacheTtlSeconds ?? 900; // Default 15 min
+      // ttlSeconds already computed above (line 197)
 
       // Cache write failures are silent per AC#9 (handled inside cacheService.set)
       await cacheService.set(

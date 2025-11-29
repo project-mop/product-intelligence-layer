@@ -32,6 +32,15 @@ export const env = createEnv({
     ANTHROPIC_MODEL: z.string().optional(),
     LLM_TIMEOUT_MS: z.coerce.number().optional(),
 
+    // Cache Configuration (Epic 4)
+    CACHE_DEFAULT_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(86400)
+      .optional()
+      .default(900), // Default 15 minutes per FR-513
+
     // Future: External Services (uncomment when needed)
     // STRIPE_SECRET_KEY: z.string().optional(),
     // STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -63,6 +72,8 @@ export const env = createEnv({
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
     LLM_TIMEOUT_MS: process.env.LLM_TIMEOUT_MS,
+    // Cache Configuration
+    CACHE_DEFAULT_TTL_SECONDS: process.env.CACHE_DEFAULT_TTL_SECONDS,
   },
 
   /**

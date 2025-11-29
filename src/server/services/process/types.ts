@@ -80,6 +80,27 @@ export interface AttributeDefinition {
 }
 
 /**
+ * Get default cache TTL from environment or use 900 (15 min) as fallback.
+ *
+ * Note: This is evaluated at import time. For dynamic values, read env.CACHE_DEFAULT_TTL_SECONDS directly.
+ */
+function getDefaultCacheTtl(): number {
+  // In client context or build time, use the default
+  if (typeof process === "undefined" || !process.env) {
+    return 900;
+  }
+  const envValue = process.env.CACHE_DEFAULT_TTL_SECONDS;
+  if (!envValue) {
+    return 900;
+  }
+  const parsed = parseInt(envValue, 10);
+  if (isNaN(parsed) || parsed < 0 || parsed > 86400) {
+    return 900;
+  }
+  return parsed;
+}
+
+/**
  * Default values for ProcessConfig when creating a new version.
  */
 export const DEFAULT_PROCESS_CONFIG: Omit<
@@ -88,7 +109,7 @@ export const DEFAULT_PROCESS_CONFIG: Omit<
 > = {
   maxTokens: 1024,
   temperature: 0.3,
-  cacheTtlSeconds: 900,
+  cacheTtlSeconds: getDefaultCacheTtl(),
   cacheEnabled: true,
   requestsPerMinute: 60,
 };

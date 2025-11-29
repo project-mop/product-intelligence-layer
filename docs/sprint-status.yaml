@@ -75,7 +75,7 @@ development_status:
   4-3-error-response-contract: done
   4-4-llm-unavailability-handling: done
   4-5-response-caching: done
-  4-6-configurable-cache-ttl: backlog
+  4-6-configurable-cache-ttl: done
   epic-4-retrospective: optional
 
   # Epic 5: Environments & Versioning (5 stories)

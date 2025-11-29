@@ -1784,4 +1784,222 @@ describe("process Router", () => {
       expect(components[0]?.attributes).toHaveLength(5);
     });
   });
+
+  /**
+   * Story 4.6: Configurable Cache TTL
+   *
+   * Tests for the updateVersionConfig mutation that updates
+   * cache settings (cacheTtlSeconds, cacheEnabled) in ProcessVersion.config
+   */
+  describe("updateVersionConfig (Story 4.6)", () => {
+    it("should update cacheTtlSeconds in version config", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.updateVersionConfig({
+        processId: process.id,
+        config: {
+          cacheTtlSeconds: 3600, // Update to 1 hour
+        },
+      });
+
+      const config = result.config as Record<string, unknown>;
+      expect(config.cacheTtlSeconds).toBe(3600);
+      // Other config values should be preserved
+      expect(config.cacheEnabled).toBe(true);
+      expect(config.systemPrompt).toBe("Test");
+    });
+
+    it("should update cacheEnabled in version config", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: {
+          systemPrompt: "Test",
+          maxTokens: 100,
+          temperature: 0.3,
+          inputSchemaDescription: "",
+          outputSchemaDescription: "",
+          goal: "Test",
+          cacheTtlSeconds: 900,
+          cacheEnabled: true,
+          requestsPerMinute: 60,
+        },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.updateVersionConfig({
+        processId: process.id,
+        config: {
+          cacheEnabled: false, // Disable caching
+        },
+      });
+
+      const config = result.config as Record<string, unknown>;
+      expect(config.cacheEnabled).toBe(false);
+      // Other config values should be preserved
+      expect(config.cacheTtlSeconds).toBe(900);
+    });
+
+    it("should reject cacheTtlSeconds below 0", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: { systemPrompt: "Test", cacheTtlSeconds: 900 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.updateVersionConfig({
+          processId: process.id,
+          config: {
+            cacheTtlSeconds: -1,
+          },
+        })
+      ).rejects.toThrow();
+    });
+
+    it("should reject cacheTtlSeconds above 86400", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: { systemPrompt: "Test", cacheTtlSeconds: 900 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.updateVersionConfig({
+          processId: process.id,
+          config: {
+            cacheTtlSeconds: 86401, // Just over 24 hours
+          },
+        })
+      ).rejects.toThrow();
+    });
+
+    it("should accept cacheTtlSeconds=0 (disabled)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: { systemPrompt: "Test", cacheTtlSeconds: 900 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.updateVersionConfig({
+        processId: process.id,
+        config: {
+          cacheTtlSeconds: 0,
+        },
+      });
+
+      const config = result.config as Record<string, unknown>;
+      expect(config.cacheTtlSeconds).toBe(0);
+    });
+
+    it("should return NOT_FOUND for non-existent process", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.updateVersionConfig({
+          processId: "proc_nonexistent",
+          config: { cacheTtlSeconds: 3600 },
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should return BAD_REQUEST when no sandbox version exists", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      // Create PRODUCTION version only, no SANDBOX
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        config: { systemPrompt: "Test", cacheTtlSeconds: 900 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.updateVersionConfig({
+          processId: process.id,
+          config: { cacheTtlSeconds: 3600 },
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should not update processes from other tenants (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        config: { systemPrompt: "Test", cacheTtlSeconds: 900 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.updateVersionConfig({
+          processId: process.id,
+          config: { cacheTtlSeconds: 3600 },
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
 });

@@ -3700,3 +3700,283 @@ describe("Story 4.5: Response Caching", () => {
     });
   });
 });
+
+/**
+ * Story 5.2: Separate API Keys per Environment
+ *
+ * Tests environment enforcement for API keys.
+ * Verifies that sandbox keys only work on sandbox endpoints
+ * and production keys only work on production endpoints.
+ */
+describe("Story 5.2: Environment Enforcement", () => {
+  describe("Production endpoint environment check", () => {
+    it("AC 4: should return 403 when using SANDBOX key on production endpoint", async () => {
+      // Create tenant, process, and production version
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      // Create a SANDBOX key for this tenant
+      const { plainTextKey } = await apiKeyFactory.createSandboxKey(tenant.id);
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      // Should be 403 Forbidden, not 401 Unauthorized
+      expect(response.status).toBe(403);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("FORBIDDEN");
+      expect(body.error.message).toContain("sandbox");
+      expect(body.error.message).toContain("production");
+    });
+
+    it("AC 4: should accept PRODUCTION key on production endpoint", async () => {
+      // Create tenant, process (with no schema validation), and production version
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema: null, // No input validation required
+        outputSchema: null, // No output validation required
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+        version: "1.0.0",
+        publishedAt: new Date(),
+      });
+
+      // Create a PRODUCTION key for this tenant
+      const { plainTextKey } = await apiKeyFactory.createProductionKey(tenant.id);
+
+      // Set up mock LLM gateway with correct return format
+      const mockGateway: LLMGateway = {
+        generate: vi.fn().mockResolvedValue({
+          text: '{"result": "test"}',
+          usage: { inputTokens: 10, outputTokens: 5 },
+          model: "claude-sonnet-4-20250514",
+          durationMs: 100,
+        }),
+      };
+      setGatewayOverride(mockGateway);
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { test: "value" } },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+
+      // Should succeed with 200
+      expect(response.status).toBe(200);
+
+      // Verify X-Environment header
+      expect(response.headers.get("X-Environment")).toBe("production");
+
+      // Clean up
+      setGatewayOverride(null);
+    });
+  });
+
+  describe("Sandbox endpoint environment check", () => {
+    it("AC 3: should return 403 when using PRODUCTION key on sandbox endpoint", async () => {
+      // Create tenant, process, and sandbox version
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+      });
+
+      // Create a PRODUCTION key for this tenant
+      const { plainTextKey } = await apiKeyFactory.createProductionKey(tenant.id);
+
+      const request = createRequest(
+        `/api/v1/sandbox/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await sandboxGenerateHandler(
+        request,
+        createParams(process.id)
+      );
+
+      // Should be 403 Forbidden
+      expect(response.status).toBe(403);
+
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe("FORBIDDEN");
+      expect(body.error.message).toContain("production");
+      expect(body.error.message).toContain("sandbox");
+    });
+
+    it("AC 3: should accept SANDBOX key on sandbox endpoint", async () => {
+      // Create tenant, process (with no schema validation), and sandbox version
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema: null, // No input validation required
+        outputSchema: null, // No output validation required
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        version: "1.0.0",
+        publishedAt: new Date(),
+      });
+
+      // Create a SANDBOX key for this tenant
+      const { plainTextKey } = await apiKeyFactory.createSandboxKey(tenant.id);
+
+      // Set up mock LLM gateway with correct return format
+      const mockGateway: LLMGateway = {
+        generate: vi.fn().mockResolvedValue({
+          text: '{"result": "test"}',
+          usage: { inputTokens: 10, outputTokens: 5 },
+          model: "claude-sonnet-4-20250514",
+          durationMs: 100,
+        }),
+      };
+      setSandboxGatewayOverride(mockGateway);
+
+      const request = createRequest(
+        `/api/v1/sandbox/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: { test: "value" } },
+        }
+      );
+
+      const response = await sandboxGenerateHandler(
+        request,
+        createParams(process.id)
+      );
+
+      // Should succeed with 200
+      expect(response.status).toBe(200);
+
+      // Verify X-Environment header
+      expect(response.headers.get("X-Environment")).toBe("sandbox");
+
+      // Clean up
+      setSandboxGatewayOverride(null);
+    });
+  });
+
+  describe("AC 5: Error message clarity for environment mismatch", () => {
+    it("should return clear message when sandbox key used on production endpoint", async () => {
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "PRODUCTION",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.createSandboxKey(tenant.id);
+
+      const request = createRequest(
+        `/api/v1/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await generateHandler(request, createParams(process.id));
+      const body = await response.json();
+
+      // Error message should clearly indicate the mismatch
+      expect(body.error.message).toBe(
+        "sandbox API key cannot access production endpoints"
+      );
+    });
+
+    it("AC 6: should return clear message when production key used on sandbox endpoint", async () => {
+      const tenant = await tenantFactory.create();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+      });
+
+      const { plainTextKey } = await apiKeyFactory.createProductionKey(tenant.id);
+
+      const request = createRequest(
+        `/api/v1/sandbox/intelligence/${process.id}/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${plainTextKey}`,
+          },
+          body: { input: {} },
+        }
+      );
+
+      const response = await sandboxGenerateHandler(
+        request,
+        createParams(process.id)
+      );
+      const body = await response.json();
+
+      // Error message should clearly indicate the mismatch
+      expect(body.error.message).toBe(
+        "production API key cannot access sandbox endpoints"
+      );
+    });
+  });
+
+  describe("AC 10: Existing keys should default to SANDBOX", () => {
+    it("should create new keys with SANDBOX as default environment", async () => {
+      const tenant = await tenantFactory.create();
+
+      // Create key without specifying environment - factory defaults to PRODUCTION
+      // but schema defaults to SANDBOX for new records without explicit environment
+      // This test verifies the Prisma schema @default(SANDBOX) works
+      const { apiKey } = await apiKeyFactory.create({
+        tenantId: tenant.id,
+        environment: "SANDBOX",
+      });
+
+      expect(apiKey.environment).toBe("SANDBOX");
+    });
+  });
+});

@@ -185,7 +185,7 @@ model ApiKey {
     name        String // User-friendly name for the key
     keyHash     String       @unique // SHA-256 hash of the actual key
     scopes      Json // Array of scopes: ["process:*"] or ["process:proc_abc123"]
-    environment Environment
+    environment Environment  @default(SANDBOX)
     expiresAt   DateTime?
     createdAt   DateTime     @default(now())
     revokedAt   DateTime?

@@ -80,6 +80,58 @@ export const apiKeyRouter = createTRPCRouter({
   }),
 
   /**
+   * List API keys grouped by environment.
+   *
+   * Returns non-revoked keys organized into sandbox and production groups.
+   * Used by the API keys page to display keys in separate sections.
+   *
+   * Story 5.2: AC 2, 8
+   */
+  listByEnvironment: protectedProcedure.query(async ({ ctx }) => {
+    const tenantId = ctx.session.user.tenantId;
+
+    if (!tenantId) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "User has no associated tenant",
+      });
+    }
+
+    const keys = await listApiKeys(tenantId);
+
+    // Filter to non-revoked keys only and group by environment
+    const activeKeys = keys.filter((key) => !key.revokedAt);
+
+    const sandbox = activeKeys
+      .filter((key) => key.environment === "SANDBOX")
+      .map((key) => ({
+        id: key.id,
+        name: key.name,
+        environment: key.environment,
+        scopes: key.scopes as string[],
+        expiresAt: key.expiresAt,
+        createdAt: key.createdAt,
+        revokedAt: key.revokedAt,
+        lastUsedAt: key.lastUsedAt,
+      }));
+
+    const production = activeKeys
+      .filter((key) => key.environment === "PRODUCTION")
+      .map((key) => ({
+        id: key.id,
+        name: key.name,
+        environment: key.environment,
+        scopes: key.scopes as string[],
+        expiresAt: key.expiresAt,
+        createdAt: key.createdAt,
+        revokedAt: key.revokedAt,
+        lastUsedAt: key.lastUsedAt,
+      }));
+
+    return { sandbox, production };
+  }),
+
+  /**
    * Create a new API key.
    *
    * Returns the ApiKey record AND the plaintext key (shown only once).

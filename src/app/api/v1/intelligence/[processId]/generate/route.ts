@@ -24,6 +24,10 @@ import {
   assertProcessAccess,
 } from "~/server/services/auth/api-key-validator";
 import {
+  assertEnvironmentMatch,
+  EnvironmentMismatchError,
+} from "~/server/middleware/environment-guard";
+import {
   unauthorized,
   forbidden,
   notFound,
@@ -143,7 +147,31 @@ export async function POST(
 
   const { context: apiKeyContext } = authResult;
 
-  // Step 2: Check if API key has access to this process
+  // Step 2: Verify API key environment matches endpoint (Story 5.2)
+  try {
+    assertEnvironmentMatch(apiKeyContext.environment, "PRODUCTION");
+  } catch (error) {
+    if (error instanceof EnvironmentMismatchError) {
+      console.warn({
+        message: "Environment mismatch rejected",
+        request_id: requestId,
+        tenant_id: apiKeyContext.tenantId,
+        key_environment: error.keyEnvironment,
+        path_environment: error.endpointEnvironment,
+        key_id: apiKeyContext.keyId,
+      });
+    }
+    const response = forbidden(
+      error instanceof EnvironmentMismatchError
+        ? error.message
+        : "Environment access denied",
+      requestId
+    );
+    response.headers.set("X-Environment", "production");
+    return response;
+  }
+
+  // Step 3: Check if API key has access to this process
   try {
     assertProcessAccess(apiKeyContext, processId);
   } catch {
@@ -155,7 +183,7 @@ export async function POST(
     return response;
   }
 
-  // Step 3: Resolve PRODUCTION version using version resolver
+  // Step 4: Resolve PRODUCTION version using version resolver
   // Story 5.1: Production endpoint only serves PRODUCTION versions
   const resolvedVersion = await resolveVersion({
     processId,

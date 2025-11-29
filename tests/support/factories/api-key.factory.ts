@@ -153,11 +153,41 @@ async function createMany(
   return results;
 }
 
+/**
+ * Creates a sandbox API key and persists to database.
+ * Story 5.2: Convenience method for creating SANDBOX environment keys.
+ *
+ * @param tenantId - The tenant ID to create the key for
+ * @param overrides - Additional overrides
+ */
+async function createSandboxKey(
+  tenantId: string,
+  overrides: Partial<Omit<ApiKey, "tenantId" | "environment">> = {}
+): Promise<{ apiKey: ApiKey; plainTextKey: string }> {
+  return create({ ...overrides, tenantId, environment: "SANDBOX" });
+}
+
+/**
+ * Creates a production API key and persists to database.
+ * Story 5.2: Convenience method for creating PRODUCTION environment keys.
+ *
+ * @param tenantId - The tenant ID to create the key for
+ * @param overrides - Additional overrides
+ */
+async function createProductionKey(
+  tenantId: string,
+  overrides: Partial<Omit<ApiKey, "tenantId" | "environment">> = {}
+): Promise<{ apiKey: ApiKey; plainTextKey: string }> {
+  return create({ ...overrides, tenantId, environment: "PRODUCTION" });
+}
+
 export const apiKeyFactory = {
   build,
   create,
   createForTenant,
   createMany,
+  createSandboxKey,
+  createProductionKey,
 };
 
 /**

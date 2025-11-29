@@ -1,0 +1,147 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>2</storyId>
+    <title>Separate API Keys per Environment</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-2-separate-api-keys-per-environment.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>security-conscious user</asA>
+    <iWant>sandbox and production to use separate API keys</iWant>
+    <soThat>test keys can't accidentally access production and I can safely manage credentials for each environment</soThat>
+    <tasks>
+      <task id="1" ac="1,10">Add environment field to ApiKey model - modify prisma/schema.prisma</task>
+      <task id="2" ac="1,9">Update API key creation tRPC endpoint with environment input</task>
+      <task id="3" ac="3,4,5,6">Update API key validation service to return environment</task>
+      <task id="4" ac="3,4,5,6">Create environment guard middleware</task>
+      <task id="5" ac="3,5">Update sandbox API route with environment check</task>
+      <task id="6" ac="4,6">Update production API route with environment check</task>
+      <task id="7" ac="2,8">Update API key list query to group by environment</task>
+      <task id="8" ac="2,8">Create EnvironmentKeyGroup UI component</task>
+      <task id="9" ac="1,9">Update API key creation dialog</task>
+      <task id="10" ac="2,8">Update API keys list page</task>
+      <task id="11" ac="9">Update key display and copy functionality</task>
+      <task id="12" ac="3,4,5,6">Write unit tests for environment guard</task>
+      <task id="13" ac="3,4">Write unit tests for API key validation with environment</task>
+      <task id="14" ac="3,4,5,6">Write integration tests for environment enforcement</task>
+      <task id="15" ac="1,2,7">Write integration tests for API key router</task>
+      <task id="16" ac="all tests">Update API key factory for environment</task>
+      <task id="17" ac="1-10">Verification - typecheck, lint, unit tests, integration tests, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1" fr="FR-604">API key creation requires selecting environment (SANDBOX or PRODUCTION)</criterion>
+    <criterion id="2" fr="FR-604">API keys page displays keys grouped by environment with clear headers</criterion>
+    <criterion id="3" fr="FR-604">Sandbox keys only authenticate requests to /api/v1/sandbox/... endpoints</criterion>
+    <criterion id="4" fr="FR-604">Production keys only authenticate requests to /api/v1/intelligence/... endpoints</criterion>
+    <criterion id="5" fr="FR-604">Using sandbox key on production endpoint returns 403 Forbidden with clear message</criterion>
+    <criterion id="6" fr="FR-604">Using production key on sandbox endpoint returns 403 Forbidden with clear message</criterion>
+    <criterion id="7" fr="FR-604">Each environment's keys can be rotated independently</criterion>
+    <criterion id="8" fr="FR-604">Key list shows environment badge (yellow=sandbox, green=production)</criterion>
+    <criterion id="9" fr="FR-604">Key creation dialog shows environment-specific usage instructions</criterion>
+    <criterion id="10" fr="FR-604">Existing keys (pre-Epic 5) are migrated to SANDBOX environment</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-5.md" title="Epic 5 Technical Specification" section="Story 5.2: Separate API Keys per Environment" snippet="Defines AC 5.2.1-10, Enhanced ApiKey Model with environment field, API Key Creation with Environment workflow, and environment guard middleware pattern." />
+      <doc path="docs/architecture.md" title="Architecture" section="Public API Patterns, Permission Checking Patterns" snippet="Defines API key validation flow, assertProcessAccess pattern, and environment enforcement rules. Environment is tied to API key, not request." />
+      <doc path="docs/epics.md" title="Epic Breakdown" section="Story 5.2: Separate API Keys per Environment" snippet="AC: Sandbox keys only work on sandbox endpoints, production keys only on production endpoints. Covers FR-604." />
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Types Overview, Coverage Requirements" snippet="Unit tests for services/utilities, integration tests for routers. 90% coverage threshold. Use Vitest for unit/integration, Playwright for E2E." />
+      <doc path="docs/stories/5-1-sandbox-and-production-modes.md" title="Story 5.1" section="Dev Agent Record" snippet="Previous story learnings: Environment/VersionStatus enums in Prisma, EnvironmentBadge component, version-resolver service pattern." />
+    </docs>
+    <code>
+      <artifact path="prisma/schema.prisma" kind="schema" symbol="ApiKey" lines="182-201" reason="ApiKey model already has environment field - needs index on (tenantId, environment)" />
+      <artifact path="prisma/schema.prisma" kind="enum" symbol="Environment" lines="18-21" reason="Environment enum (SANDBOX, PRODUCTION) already exists - reuse for API key scope" />
+      <artifact path="src/server/services/auth/api-key.ts" kind="service" symbol="createApiKey, rotateApiKey" lines="90-195" reason="API key generation service - already supports environment, generates pil_live_ and pil_test_ prefixes" />
+      <artifact path="src/server/services/auth/api-key-validator.ts" kind="service" symbol="validateApiKey, ApiKeyContext" lines="27-179" reason="API key validation service - already returns environment in context. Add assertEnvironmentMatch function here." />
+      <artifact path="src/server/api/routers/apiKey.ts" kind="router" symbol="apiKeyRouter" lines="1-301" reason="tRPC router for API key CRUD - already has environment in create input, needs listByEnvironment query" />
+      <artifact path="src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts" kind="api-route" symbol="POST" lines="119-327" reason="Sandbox API route - add environment check after validateApiKey" />
+      <artifact path="src/app/api/v1/intelligence/[processId]/generate/route.ts" kind="api-route" symbol="POST" lines="124-336" reason="Production API route - add environment check after validateApiKey" />
+      <artifact path="src/server/services/api/response.ts" kind="service" symbol="forbidden" reason="Response helper for 403 Forbidden - use for environment mismatch errors" />
+      <artifact path="src/components/process/EnvironmentBadge.tsx" kind="component" symbol="EnvironmentBadge" reason="Environment badge component from Story 5.1 - reuse for API key list display" />
+      <artifact path="tests/support/factories/api-key.factory.ts" kind="test-factory" symbol="apiKeyFactory" lines="1-218" reason="API key test factory - add createSandboxKey and createProductionKey convenience methods" />
+      <artifact path="tests/integration/api-key-router.test.ts" kind="test" symbol="ApiKey Router" reason="Integration tests for API key router - add Story 5.2 environment tests" />
+      <artifact path="tests/integration/intelligence-api.test.ts" kind="test" symbol="Intelligence API" reason="Intelligence API integration tests - add Story 5.2 environment enforcement tests" />
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@prisma/client" version="^7.0.1" reason="Database access for ApiKey model with environment field" />
+        <package name="zod" version="^3.24.2" reason="Input validation for tRPC endpoints - z.enum for environment" />
+        <package name="@trpc/server" version="^11.0.0" reason="tRPC router for API key operations" />
+        <package name="vitest" version="^4.0.14" reason="Unit and integration testing framework" />
+        <package name="next" version="^15.2.3" reason="API routes for sandbox/production endpoints" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture" type="security">Environment is tied to API key, not request - users cannot override via headers</constraint>
+    <constraint source="architecture" type="security">ALWAYS include tenantId in WHERE clauses for all database queries</constraint>
+    <constraint source="tech-spec" type="api">Path-based routing determines expected environment: /sandbox/ = SANDBOX, /intelligence/ = PRODUCTION</constraint>
+    <constraint source="tech-spec" type="api">Key environment must match path environment; mismatch returns 403</constraint>
+    <constraint source="story" type="migration">Existing keys default to SANDBOX via @default(SANDBOX) - safe default</constraint>
+    <constraint source="story" type="pattern">Use assertEnvironmentMatch function pattern from Dev Notes</constraint>
+    <constraint source="story" type="logging">Log environment mismatch as security event with tenant_id, key_environment, path_environment</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="assertEnvironmentMatch" kind="function" path="src/server/middleware/environment-guard.ts">
+      <signature>function assertEnvironmentMatch(keyEnvironment: "SANDBOX" | "PRODUCTION", requestEnvironment: "SANDBOX" | "PRODUCTION"): void</signature>
+      <description>Validates that API key environment matches the endpoint environment. Throws ApiError with code FORBIDDEN if mismatch.</description>
+    </interface>
+    <interface name="getEndpointEnvironment" kind="function" path="src/server/middleware/environment-guard.ts">
+      <signature>function getEndpointEnvironment(pathname: string): "SANDBOX" | "PRODUCTION"</signature>
+      <description>Determines environment from URL pathname. Returns SANDBOX if path includes /sandbox/, otherwise PRODUCTION.</description>
+    </interface>
+    <interface name="ApiKeyContext" kind="interface" path="src/server/services/auth/api-key-validator.ts">
+      <signature>interface ApiKeyContext { tenantId: string; keyId: string; scopes: string[]; environment: Environment; }</signature>
+      <description>Context returned from validateApiKey - already includes environment field from database.</description>
+    </interface>
+    <interface name="listByEnvironment" kind="tRPC-query" path="src/server/api/routers/apiKey.ts">
+      <signature>listByEnvironment: protectedProcedure.query() => { sandbox: ApiKey[]; production: ApiKey[] }</signature>
+      <description>Returns API keys grouped by environment for the current tenant.</description>
+    </interface>
+    <interface name="POST /api/v1/intelligence/:processId/generate" kind="rest-endpoint" path="src/app/api/v1/intelligence/[processId]/generate/route.ts">
+      <signature>POST with Authorization: Bearer pil_live_... - requires PRODUCTION key</signature>
+      <description>Production endpoint - returns 403 if sandbox key used.</description>
+    </interface>
+    <interface name="POST /api/v1/sandbox/intelligence/:processId/generate" kind="rest-endpoint" path="src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts">
+      <signature>POST with Authorization: Bearer pil_test_... - requires SANDBOX key</signature>
+      <description>Sandbox endpoint - returns 403 if production key used.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Follow Vitest patterns from testing-strategy-mvp.md. Unit tests for isolated functions (environment guard, assertEnvironmentMatch). Integration tests for API routes and tRPC router using real PostgreSQL database. 90% coverage threshold. Use apiKeyFactory for test data. Structure tests with describe/it blocks, AAA pattern.
+    </standards>
+    <locations>
+      <location>tests/unit/server/middleware/environment-guard.test.ts</location>
+      <location>tests/unit/api-key.test.ts (update existing)</location>
+      <location>tests/integration/intelligence-api.test.ts (add Story 5.2 describe block)</location>
+      <location>tests/integration/api-key-router.test.ts (add environment tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="3">Test: Sandbox key on sandbox endpoint returns 200 success</idea>
+      <idea ac="4">Test: Production key on production endpoint returns 200 success</idea>
+      <idea ac="5">Test: Sandbox key on production endpoint returns 403 Forbidden with clear message</idea>
+      <idea ac="6">Test: Production key on sandbox endpoint returns 403 Forbidden with clear message</idea>
+      <idea ac="5,6">Test: Error response includes environment mismatch details</idea>
+      <idea ac="1">Test: Create sandbox API key sets environment = SANDBOX</idea>
+      <idea ac="1">Test: Create production API key sets environment = PRODUCTION</idea>
+      <idea ac="2">Test: listByEnvironment returns keys grouped correctly</idea>
+      <idea ac="7">Test: Rotating sandbox key creates new sandbox key</idea>
+      <idea ac="7">Test: Rotating production key creates new production key</idea>
+      <idea ac="unit">Test: getEndpointEnvironment returns SANDBOX for /sandbox/ paths</idea>
+      <idea ac="unit">Test: getEndpointEnvironment returns PRODUCTION for /intelligence/ paths</idea>
+      <idea ac="unit">Test: assertEnvironmentMatch passes when environments match</idea>
+      <idea ac="unit">Test: assertEnvironmentMatch throws when environments differ</idea>
+    </ideas>
+  </tests>
+</story-context>

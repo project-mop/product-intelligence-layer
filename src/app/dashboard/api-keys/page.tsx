@@ -3,14 +3,33 @@
 import { useState } from "react";
 
 import { api } from "~/trpc/react";
+import { EnvironmentKeyGroup } from "~/components/api-keys/EnvironmentKeyGroup";
+import { EnvironmentBadge } from "~/components/process/EnvironmentBadge";
 
 type EnvironmentType = "SANDBOX" | "PRODUCTION";
 
 interface CreateKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (plainTextKey: string) => void;
+  onCreated: (plainTextKey: string, environment: EnvironmentType) => void;
 }
+
+const environmentInstructions = {
+  SANDBOX: {
+    title: "Sandbox Key",
+    description: "Use for testing and development",
+    endpoint: "/api/v1/sandbox/intelligence/[processId]/generate",
+    prefix: "pil_test_",
+    note: "Sandbox keys can only access sandbox endpoints. Perfect for testing your integration without affecting production data.",
+  },
+  PRODUCTION: {
+    title: "Production Key",
+    description: "Use for live traffic",
+    endpoint: "/api/v1/intelligence/[processId]/generate",
+    prefix: "pil_live_",
+    note: "Production keys can only access production endpoints. Use for your live application.",
+  },
+};
 
 function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
   const [name, setName] = useState("");
@@ -18,7 +37,7 @@ function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
 
   const createKey = api.apiKey.create.useMutation({
     onSuccess: (data) => {
-      onCreated(data.plainTextKey);
+      onCreated(data.plainTextKey, environment);
       setName("");
       setEnvironment("SANDBOX");
     },
@@ -30,6 +49,8 @@ function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
     e.preventDefault();
     createKey.mutate({ name, environment });
   };
+
+  const instructions = environmentInstructions[environment];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -51,31 +72,91 @@ function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Production API Key"
+              placeholder="e.g., My Integration Key"
               required
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
+          {/* Environment Selection with Radio Buttons */}
           <div>
-            <label
-              htmlFor="environment"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label className="block text-sm font-medium text-gray-700">
               Environment
             </label>
-            <select
-              id="environment"
-              value={environment}
-              onChange={(e) => setEnvironment(e.target.value as EnvironmentType)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="SANDBOX">Sandbox (Test)</option>
-              <option value="PRODUCTION">Production (Live)</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Sandbox keys have prefix pil_test_, Production keys have pil_live_
+            <div className="mt-2 space-y-2">
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  environment === "SANDBOX"
+                    ? "border-yellow-400 bg-yellow-50"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="environment"
+                  value="SANDBOX"
+                  checked={environment === "SANDBOX"}
+                  onChange={() => setEnvironment("SANDBOX")}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">Sandbox</span>
+                    <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-700">
+                      Test
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    For testing with /api/v1/sandbox/... endpoints
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  environment === "PRODUCTION"
+                    ? "border-green-400 bg-green-50"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="environment"
+                  value="PRODUCTION"
+                  checked={environment === "PRODUCTION"}
+                  onChange={() => setEnvironment("PRODUCTION")}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">Production</span>
+                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                      Live
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    For live traffic with /api/v1/intelligence/... endpoints
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Environment-specific instructions */}
+          <div
+            className={`rounded-md p-3 ${
+              environment === "SANDBOX"
+                ? "bg-yellow-50 text-yellow-800"
+                : "bg-green-50 text-green-800"
+            }`}
+          >
+            <p className="text-sm">
+              <strong>Key prefix:</strong>{" "}
+              <code className="rounded bg-white/50 px-1 font-mono text-xs">
+                {instructions.prefix}
+              </code>
             </p>
+            <p className="mt-1 text-sm">{instructions.note}</p>
           </div>
 
           {createKey.error && (
@@ -95,9 +176,15 @@ function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
             <button
               type="submit"
               disabled={createKey.isPending || !name.trim()}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className={`rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                environment === "SANDBOX"
+                  ? "bg-yellow-600 hover:bg-yellow-500"
+                  : "bg-green-600 hover:bg-green-500"
+              }`}
             >
-              {createKey.isPending ? "Creating..." : "Create Key"}
+              {createKey.isPending
+                ? "Creating..."
+                : `Create ${environment === "SANDBOX" ? "Sandbox" : "Production"} Key`}
             </button>
           </div>
         </form>
@@ -109,10 +196,16 @@ function CreateKeyModal({ isOpen, onClose, onCreated }: CreateKeyModalProps) {
 interface KeyDisplayModalProps {
   isOpen: boolean;
   plainTextKey: string;
+  environment: EnvironmentType;
   onClose: () => void;
 }
 
-function KeyDisplayModal({ isOpen, plainTextKey, onClose }: KeyDisplayModalProps) {
+function KeyDisplayModal({
+  isOpen,
+  plainTextKey,
+  environment,
+  onClose,
+}: KeyDisplayModalProps) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
@@ -122,6 +215,8 @@ function KeyDisplayModal({ isOpen, plainTextKey, onClose }: KeyDisplayModalProps
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const instructions = environmentInstructions[environment];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -145,6 +240,7 @@ function KeyDisplayModal({ isOpen, plainTextKey, onClose }: KeyDisplayModalProps
           <h2 className="text-xl font-semibold text-gray-900">
             Save Your API Key
           </h2>
+          <EnvironmentBadge environment={environment} size="md" />
         </div>
 
         <div className="mb-4 rounded-md bg-yellow-50 p-4">
@@ -173,6 +269,22 @@ function KeyDisplayModal({ isOpen, plainTextKey, onClose }: KeyDisplayModalProps
               {copied ? "Copied!" : "Copy"}
             </button>
           </div>
+        </div>
+
+        {/* Usage Example */}
+        <div className="mb-4 rounded-md bg-gray-100 p-3">
+          <p className="mb-1 text-xs font-medium uppercase text-gray-500">
+            Example Endpoint
+          </p>
+          <code className="block text-sm text-gray-700">
+            POST {instructions.endpoint}
+          </code>
+          <p className="mt-2 text-xs font-medium uppercase text-gray-500">
+            Header
+          </p>
+          <code className="block text-sm text-gray-700">
+            Authorization: Bearer {instructions.prefix}...
+          </code>
         </div>
 
         <div className="flex justify-end">
@@ -245,55 +357,47 @@ function ConfirmDialog({
   );
 }
 
-function formatDate(date: Date | null): string {
-  if (!date) return "Never";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatDateTime(date: Date | null): string {
-  if (!date) return "Never";
-  return new Date(date).toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export default function ApiKeysPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newKeyToShow, setNewKeyToShow] = useState<string | null>(null);
+  const [newKeyToShow, setNewKeyToShow] = useState<{
+    key: string;
+    environment: EnvironmentType;
+  } | null>(null);
   const [keyToRevoke, setKeyToRevoke] = useState<string | null>(null);
-  const [keyToRotate, setKeyToRotate] = useState<string | null>(null);
+  const [keyToRotate, setKeyToRotate] = useState<{
+    id: string;
+    environment: EnvironmentType;
+  } | null>(null);
 
   const utils = api.useUtils();
 
-  const { data: keys, isLoading, error } = api.apiKey.list.useQuery();
+  // Use listByEnvironment for grouped display (Story 5.2)
+  const {
+    data: keysByEnvironment,
+    isLoading,
+    error,
+  } = api.apiKey.listByEnvironment.useQuery();
 
   const revokeKey = api.apiKey.revoke.useMutation({
     onSuccess: () => {
-      void utils.apiKey.list.invalidate();
+      void utils.apiKey.listByEnvironment.invalidate();
       setKeyToRevoke(null);
     },
   });
 
   const rotateKey = api.apiKey.rotate.useMutation({
     onSuccess: (data) => {
-      void utils.apiKey.list.invalidate();
+      void utils.apiKey.listByEnvironment.invalidate();
+      const env = keyToRotate?.environment ?? "SANDBOX";
       setKeyToRotate(null);
-      setNewKeyToShow(data.plainTextKey);
+      setNewKeyToShow({ key: data.plainTextKey, environment: env });
     },
   });
 
-  const handleKeyCreated = (plainTextKey: string) => {
+  const handleKeyCreated = (plainTextKey: string, environment: EnvironmentType) => {
     setShowCreateModal(false);
-    setNewKeyToShow(plainTextKey);
-    void utils.apiKey.list.invalidate();
+    setNewKeyToShow({ key: plainTextKey, environment });
+    void utils.apiKey.listByEnvironment.invalidate();
   };
 
   if (error) {
@@ -318,7 +422,7 @@ export default function ApiKeysPage() {
             <h1 className="text-2xl font-bold text-gray-900">API Keys</h1>
             <p className="mt-1 text-sm text-gray-600">
               Manage your API keys for accessing the Product Intelligence Layer
-              API
+              API. Keys are scoped to a specific environment.
             </p>
           </div>
           <button
@@ -329,137 +433,33 @@ export default function ApiKeysPage() {
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          {isLoading ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">Loading API keys...</p>
-            </div>
-          ) : !keys || keys.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">No API keys yet</p>
-              <p className="mt-1 text-sm text-gray-400">
-                Create your first API key to get started
-              </p>
-            </div>
-          ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Environment
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Last Used
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Expires
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {keys.map((key) => {
-                  const isRevoked = !!key.revokedAt;
-                  const isExpired =
-                    key.expiresAt && new Date(key.expiresAt) < new Date();
+        {isLoading ? (
+          <div className="rounded-lg bg-white p-8 text-center shadow">
+            <p className="text-gray-500">Loading API keys...</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Sandbox Keys Section */}
+            <EnvironmentKeyGroup
+              environment="SANDBOX"
+              keys={keysByEnvironment?.sandbox ?? []}
+              onRevoke={(keyId) => setKeyToRevoke(keyId)}
+              onRotate={(keyId) =>
+                setKeyToRotate({ id: keyId, environment: "SANDBOX" })
+              }
+            />
 
-                  return (
-                    <tr
-                      key={key.id}
-                      className={isRevoked ? "bg-gray-50" : undefined}
-                    >
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span
-                          className={
-                            isRevoked
-                              ? "text-gray-400 line-through"
-                              : "font-medium text-gray-900"
-                          }
-                        >
-                          {key.name}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            key.environment === "PRODUCTION"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {key.environment === "PRODUCTION" ? "Live" : "Test"}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                        {formatDate(key.createdAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                        {formatDateTime(key.lastUsedAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                        {key.expiresAt ? (
-                          <span
-                            className={
-                              isExpired ? "text-red-600" : undefined
-                            }
-                          >
-                            {formatDate(key.expiresAt)}
-                          </span>
-                        ) : (
-                          "Never"
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        {isRevoked ? (
-                          <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
-                            Revoked
-                          </span>
-                        ) : isExpired ? (
-                          <span className="inline-flex rounded-full bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
-                            Expired
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                        {!isRevoked && (
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => setKeyToRotate(key.id)}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              Rotate
-                            </button>
-                            <button
-                              onClick={() => setKeyToRevoke(key.id)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Revoke
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+            {/* Production Keys Section */}
+            <EnvironmentKeyGroup
+              environment="PRODUCTION"
+              keys={keysByEnvironment?.production ?? []}
+              onRevoke={(keyId) => setKeyToRevoke(keyId)}
+              onRotate={(keyId) =>
+                setKeyToRotate({ id: keyId, environment: "PRODUCTION" })
+              }
+            />
+          </div>
+        )}
       </div>
 
       <CreateKeyModal
@@ -470,7 +470,8 @@ export default function ApiKeysPage() {
 
       <KeyDisplayModal
         isOpen={!!newKeyToShow}
-        plainTextKey={newKeyToShow ?? ""}
+        plainTextKey={newKeyToShow?.key ?? ""}
+        environment={newKeyToShow?.environment ?? "SANDBOX"}
         onClose={() => setNewKeyToShow(null)}
       />
 
@@ -492,7 +493,9 @@ export default function ApiKeysPage() {
         confirmText="Rotate Key"
         confirmVariant="warning"
         isLoading={rotateKey.isPending}
-        onConfirm={() => keyToRotate && rotateKey.mutate({ id: keyToRotate })}
+        onConfirm={() =>
+          keyToRotate && rotateKey.mutate({ id: keyToRotate.id })
+        }
         onCancel={() => setKeyToRotate(null)}
       />
     </div>

@@ -85,7 +85,7 @@ development_status:
   5-3-promote-to-production: done
   5-4-version-history-and-rollback: done
   5-5-version-pinning-and-deprecation: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: completed
 
   # Epic 6: Observability & Logging (6 stories - added Story 6.6 from Epic 3)
   epic-6: backlog

@@ -465,16 +465,40 @@ function buildDeprecationMessage(
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A - clean implementation
+
 ### Completion Notes List
 
+1. Enhanced version-resolver.ts with pinning support (AC 1, 2, 7, 8)
+2. Created parse-version-header.ts for X-Version header extraction (AC 1)
+3. Created version-headers.ts for response header building (AC 4, 5, 6, 9, 10)
+4. Created sunset.ts with 90-day sunset calculation (AC 6)
+5. Integrated version headers into both production and sandbox API routes
+6. Added VERSION_NOT_FOUND and VERSION_ENVIRONMENT_MISMATCH error codes
+7. Comprehensive integration tests covering all 10 ACs
+8. All typecheck, lint, and tests passing
+
 ### File List
+
+**Created:**
+- `src/server/services/process/version-headers.ts` - Version response headers utility
+- `src/server/services/process/parse-version-header.ts` - X-Version header parser
+- `src/server/services/process/sunset.ts` - Sunset date calculation utilities
+- `tests/integration/version-pinning.test.ts` - Story 5.5 integration tests
+
+**Modified:**
+- `src/server/services/process/version-resolver.ts` - Added pinning support, error handling
+- `src/app/api/v1/intelligence/[processId]/generate/route.ts` - Added version headers
+- `src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts` - Added version headers
+- `src/lib/errors.ts` - Added VERSION_NOT_FOUND, VERSION_ENVIRONMENT_MISMATCH, INVALID_VERSION error codes
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2025-11-29 | SM Agent | Initial story creation from Epic 5 tech spec |
+| 2025-11-29 | Dev Agent (Claude Opus 4.5) | Implementation complete - all ACs verified |

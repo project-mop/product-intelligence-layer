@@ -114,7 +114,14 @@ async function create(
     processId = process.id;
   }
 
-  const builtData = build({ ...overrides, processId });
+  // Auto-set status: "ACTIVE" for PRODUCTION environment if status not explicitly provided
+  // This matches real-world behavior where PRODUCTION versions are typically active
+  const effectiveOverrides = { ...overrides };
+  if (overrides.environment === "PRODUCTION" && overrides.status === undefined) {
+    effectiveOverrides.status = "ACTIVE" as VersionStatus;
+  }
+
+  const builtData = build({ ...effectiveOverrides, processId });
   const { config, ...rest } = builtData;
   return testDb.processVersion.create({
     data: {

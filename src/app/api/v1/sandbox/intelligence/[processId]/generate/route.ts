@@ -88,9 +88,10 @@ function createSandboxSuccessResponse(
       success: true,
       data,
       meta: {
-        requestId,
-        latencyMs,
+        version: versionNumber ?? "1.0.0",
         cached,
+        latency_ms: latencyMs,
+        request_id: requestId,
       },
     },
     { status: 200, headers }

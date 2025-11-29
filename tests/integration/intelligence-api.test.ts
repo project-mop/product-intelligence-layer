@@ -22,6 +22,8 @@ import { apiKeyFactory } from "../support/factories/api-key.factory";
 // Import route handlers directly
 import { POST as generateHandler } from "~/app/api/v1/intelligence/[processId]/generate/route";
 import { setGatewayOverride } from "~/app/api/v1/intelligence/[processId]/generate/testing";
+import { POST as sandboxGenerateHandler } from "~/app/api/v1/sandbox/intelligence/[processId]/generate/route";
+import { setGatewayOverride as setSandboxGatewayOverride } from "~/app/api/v1/sandbox/intelligence/[processId]/generate/testing";
 import { GET as schemaHandler } from "~/app/api/v1/intelligence/[processId]/schema/route";
 import type { LLMGateway, GenerateParams, GenerateResult } from "~/server/services/llm/types";
 import { LLMError } from "~/server/services/llm/types";
@@ -326,7 +328,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error.code).toBe("NOT_FOUND");
-      expect(body.error.message).toContain("no published version");
+      expect(body.error.message).toContain("No production version");
     });
 
     it("should return 404 for deleted process", async () => {
@@ -447,6 +449,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       await processVersionFactory.create({
         processId: process.id,
         environment: "PRODUCTION",
+        version: "1.0.0",
         publishedAt: new Date(),
       });
 
@@ -494,7 +497,8 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
         model: "claude-3-haiku",
         durationMs: 100,
       }));
-      setGatewayOverride(mockGateway);
+      // Use sandbox gateway override for sandbox endpoint
+      setSandboxGatewayOverride(mockGateway);
 
       const tenant = await tenantFactory.create();
       const process = await processFactory.create({
@@ -513,7 +517,7 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
       });
 
       const request = createRequest(
-        `/api/v1/intelligence/${process.id}/generate`,
+        `/api/v1/sandbox/intelligence/${process.id}/generate`,
         {
           method: "POST",
           headers: {
@@ -524,11 +528,15 @@ describe("POST /api/v1/intelligence/:processId/generate", () => {
         }
       );
 
-      const response = await generateHandler(request, createParams(process.id));
+      // Use sandbox handler for sandbox endpoint
+      const response = await sandboxGenerateHandler(request, createParams(process.id));
 
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.data).toEqual({ sandbox: "result" });
+
+      // Clean up sandbox gateway override
+      setSandboxGatewayOverride(null);
     });
 
     it("should work with specific process scope", async () => {

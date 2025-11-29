@@ -82,7 +82,7 @@ development_status:
   epic-5: contexted
   5-1-sandbox-and-production-modes: done
   5-2-separate-api-keys-per-environment: done
-  5-3-promote-to-production: backlog
+  5-3-promote-to-production: done
   5-4-version-history-and-rollback: backlog
   5-5-version-pinning-and-deprecation: backlog
   epic-5-retrospective: optional

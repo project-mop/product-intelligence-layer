@@ -15,6 +15,8 @@ import { CacheTtlSettings } from "~/components/process/CacheTtlSettings";
 import { EnvironmentBanner } from "~/components/process/EnvironmentBanner";
 import { EnvironmentSelector } from "~/components/process/EnvironmentSelector";
 import { EnvironmentBadge } from "~/components/process/EnvironmentBadge";
+import { PromoteButton } from "~/components/process/PromoteButton";
+import { PromotionConfirmDialog } from "~/components/process/PromotionConfirmDialog";
 import { DEFAULT_PROCESS_CONFIG } from "~/server/services/process/types";
 
 function formatDate(date: Date | null): string {
@@ -74,6 +76,10 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
 
   // Story 5.1: Environment state management - must be before early returns
   const [selectedEnvironment, setSelectedEnvironment] = useState<"SANDBOX" | "PRODUCTION">("SANDBOX");
+
+  // Story 5.3: Promotion dialog state
+  const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
+  const [versionToPromote, setVersionToPromote] = useState<string | null>(null);
 
   // Loading state
   if (isLoading) {
@@ -199,6 +205,20 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Story 5.3 AC: 1 - Promote to Production button */}
+              {sandboxVersion && (
+                <PromoteButton
+                  version={{
+                    id: sandboxVersion.id,
+                    environment: sandboxVersion.environment as "SANDBOX" | "PRODUCTION",
+                    status: sandboxVersion.status as "DRAFT" | "ACTIVE" | "DEPRECATED",
+                  }}
+                  onPromote={() => {
+                    setVersionToPromote(sandboxVersion.id);
+                    setPromotionDialogOpen(true);
+                  }}
+                />
+              )}
               {/* Story 5.1 AC: 9, 10 - Environment selector */}
               <EnvironmentSelector
                 currentEnvironment={selectedEnvironment}
@@ -354,6 +374,21 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
             )}
           </CardContent>
           </Card>
+
+          {/* Story 5.3 AC: 2, 3, 4 - Promotion confirmation dialog */}
+          {versionToPromote && (
+            <PromotionConfirmDialog
+              open={promotionDialogOpen}
+              onOpenChange={setPromotionDialogOpen}
+              processId={processId}
+              versionId={versionToPromote}
+              onPromoted={() => {
+                setVersionToPromote(null);
+                // Optionally switch to production view after promotion
+                setSelectedEnvironment("PRODUCTION");
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -79,4 +79,17 @@ export interface CacheService {
    * @param processId - The process ID to invalidate
    */
   invalidate(tenantId: string, processId: string): Promise<void>;
+
+  /**
+   * Invalidates all cache entries for a process (by processId only).
+   *
+   * Used for promotion operations where tenant context is implicit.
+   * Returns the count of invalidated entries.
+   *
+   * Story 5.3 AC: 8 - Cache entries for the process are invalidated on promotion.
+   *
+   * @param processId - The process ID to invalidate
+   * @returns Number of cache entries deleted
+   */
+  invalidateByProcess(processId: string): Promise<number>;
 }

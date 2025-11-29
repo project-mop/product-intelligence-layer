@@ -25,6 +25,8 @@ import { getTestGatewayOverride } from "./process.testing";
 import { computeProcessStatus } from "~/lib/process/status";
 import { getCacheService } from "~/server/services/cache";
 import { logger } from "~/lib/logger";
+import { promoteToProduction, getPromotionPreview } from "~/server/services/process/promotion";
+import { compareVersions } from "~/server/services/process/version-diff";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -1328,6 +1330,129 @@ export const processRouter = createTRPCRouter({
         config: activeVersion.config,
         publishedAt: activeVersion.publishedAt,
         createdAt: activeVersion.createdAt,
+      };
+    }),
+
+  /**
+   * Get promotion preview for confirmation dialog.
+   *
+   * Story 5.3 AC: 2, 3, 4 - Shows change summary, diff from current production, cache warning.
+   *
+   * @returns sourceVersion, currentProductionVersion, diff, cacheEntryCount
+   */
+  getPromotionPreview: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        versionId: z.string().min(1, "Version ID is required"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Get promotion preview from service
+      const preview = await getPromotionPreview(
+        input.processId,
+        input.versionId,
+        { tenantId }
+      );
+
+      // Calculate diff between versions
+      const diff = compareVersions(
+        preview.sourceVersion,
+        preview.currentProductionVersion
+      );
+
+      return {
+        sourceVersion: {
+          id: preview.sourceVersion.id,
+          version: preview.sourceVersion.version,
+          environment: preview.sourceVersion.environment,
+          status: preview.sourceVersion.status,
+          config: preview.sourceVersion.config,
+          createdAt: preview.sourceVersion.createdAt,
+        },
+        currentProductionVersion: preview.currentProductionVersion
+          ? {
+              id: preview.currentProductionVersion.id,
+              version: preview.currentProductionVersion.version,
+              environment: preview.currentProductionVersion.environment,
+              status: preview.currentProductionVersion.status,
+              config: preview.currentProductionVersion.config,
+              publishedAt: preview.currentProductionVersion.publishedAt,
+              createdAt: preview.currentProductionVersion.createdAt,
+            }
+          : null,
+        diff,
+        cacheEntryCount: preview.cacheEntryCount,
+      };
+    }),
+
+  /**
+   * Promote a sandbox version to production.
+   *
+   * Story 5.3 AC: 5, 6, 7, 8, 9 - Creates new PRODUCTION version, deprecates old,
+   * atomic transaction, cache invalidation, audit log.
+   *
+   * @returns PromoteToProductionResult with promotedVersion, deprecatedVersion, cacheInvalidated
+   */
+  promoteToProduction: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        versionId: z.string().min(1, "Version ID is required"),
+        changeNotes: z.string().max(1000, "Change notes too long").optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Execute promotion via service (handles validation, transaction, audit)
+      const result = await promoteToProduction(
+        {
+          processId: input.processId,
+          versionId: input.versionId,
+          changeNotes: input.changeNotes,
+        },
+        {
+          tenantId,
+          userId: ctx.session.user.id,
+        }
+      );
+
+      return {
+        promotedVersion: {
+          id: result.promotedVersion.id,
+          version: result.promotedVersion.version,
+          environment: result.promotedVersion.environment,
+          status: result.promotedVersion.status,
+          publishedAt: result.promotedVersion.publishedAt,
+          changeNotes: result.promotedVersion.changeNotes,
+          createdAt: result.promotedVersion.createdAt,
+        },
+        deprecatedVersion: result.deprecatedVersion
+          ? {
+              id: result.deprecatedVersion.id,
+              version: result.deprecatedVersion.version,
+              status: result.deprecatedVersion.status,
+              deprecatedAt: result.deprecatedVersion.deprecatedAt,
+            }
+          : null,
+        cacheInvalidated: result.cacheInvalidated,
       };
     }),
 });

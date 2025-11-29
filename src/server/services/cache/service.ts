@@ -140,6 +140,30 @@ export class PostgresCacheService implements CacheService {
       console.error("[CacheService] Error invalidating cache:", error);
     }
   }
+
+  /**
+   * Invalidates all cache entries for a process (by processId only).
+   *
+   * Used for promotion operations where tenant context is implicit.
+   * Returns the count of invalidated entries.
+   *
+   * Story 5.3 AC: 8 - Cache entries for the process are invalidated on promotion.
+   *
+   * @param processId - The process ID to invalidate
+   * @returns Number of cache entries deleted
+   */
+  async invalidateByProcess(processId: string): Promise<number> {
+    try {
+      const result = await db.responseCache.deleteMany({
+        where: { processId },
+      });
+      return result.count;
+    } catch (error) {
+      // Silent failure for cache operations
+      console.error("[CacheService] Error invalidating cache by process:", error);
+      return 0;
+    }
+  }
 }
 
 /**

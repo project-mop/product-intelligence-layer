@@ -2002,4 +2002,517 @@ describe("process Router", () => {
       ).rejects.toThrow(TRPCError);
     });
   });
+
+  /**
+   * Story 5.3: Promote to Production
+   *
+   * Tests for promoting sandbox versions to production.
+   */
+  describe("getPromotionPreview (Story 5.3)", () => {
+    it("should return preview for valid sandbox version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        config: { systemPrompt: "Test prompt", temperature: 0.7 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getPromotionPreview({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.sourceVersion.id).toBe(sandboxVersion.id);
+      expect(result.sourceVersion.environment).toBe("SANDBOX");
+      expect(result.currentProductionVersion).toBeNull();
+      expect(result.diff.summary).toBe("First deployment to production");
+      expect(result.cacheEntryCount).toBe(0);
+    });
+
+    it("should include current production version in preview", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create existing production version
+      const productionVersion = await processVersionFactory.createProduction({
+        processId: process.id,
+        version: "1.0.0",
+        config: { systemPrompt: "Original prompt", temperature: 0.7 },
+      });
+
+      // Create sandbox version with changes
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "1.0.1",
+        config: { systemPrompt: "Updated prompt", temperature: 0.9 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getPromotionPreview({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.currentProductionVersion).not.toBeNull();
+      expect(result.currentProductionVersion?.id).toBe(productionVersion.id);
+      expect(result.diff.hasChanges).toBe(true);
+      expect(result.diff.changeCount.modified).toBeGreaterThan(0);
+    });
+
+    it("should include cache entry count in preview", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      // Create some cache entries
+      await testDb.responseCache.createMany({
+        data: [
+          {
+            tenantId: tenant.id,
+            processId: process.id,
+            inputHash: "hash1",
+            response: { test: true },
+            version: "1.0.0",
+            cachedAt: new Date(),
+            expiresAt: new Date(Date.now() + 3600000),
+          },
+          {
+            tenantId: tenant.id,
+            processId: process.id,
+            inputHash: "hash2",
+            response: { test: true },
+            version: "1.0.0",
+            cachedAt: new Date(),
+            expiresAt: new Date(Date.now() + 3600000),
+          },
+        ],
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getPromotionPreview({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.cacheEntryCount).toBe(2);
+    });
+
+    it("should reject non-sandbox versions", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const productionVersion = await processVersionFactory.createProduction({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.getPromotionPreview({
+          processId: process.id,
+          versionId: productionVersion.id,
+        })
+      ).rejects.toThrow("Can only promote SANDBOX versions");
+    });
+
+    it("should reject non-active versions", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const draftVersion = await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        status: "DRAFT",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.getPromotionPreview({
+          processId: process.id,
+          versionId: draftVersion.id,
+        })
+      ).rejects.toThrow("Can only promote ACTIVE versions");
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(
+        caller.process.getPromotionPreview({
+          processId: "proc_test",
+          versionId: "procv_test",
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should not return preview for other tenant's process (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.getPromotionPreview({
+          processId: process.id,
+          versionId: sandboxVersion.id,
+        })
+      ).rejects.toThrow("Version not found");
+    });
+  });
+
+  describe("promoteToProduction (Story 5.3)", () => {
+    it("should create new production version from sandbox", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "0.1.0",
+        config: { systemPrompt: "Promote me!", temperature: 0.8 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.promotedVersion.environment).toBe("PRODUCTION");
+      expect(result.promotedVersion.status).toBe("ACTIVE");
+      expect(result.promotedVersion.version).toBe("1.0.0"); // First production version
+      expect(result.deprecatedVersion).toBeNull();
+    });
+
+    it("should copy config from sandbox to production version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxConfig = {
+        systemPrompt: "Test prompt",
+        temperature: 0.9,
+        maxTokens: 1024,
+      };
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        config: sandboxConfig,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      // Verify config was copied
+      const productionVersion = await testDb.processVersion.findFirst({
+        where: {
+          processId: process.id,
+          environment: "PRODUCTION",
+          status: "ACTIVE",
+        },
+      });
+
+      expect(productionVersion?.config).toEqual(sandboxConfig);
+    });
+
+    it("should deprecate existing production version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create existing production version
+      const existingProduction = await processVersionFactory.createProduction({
+        processId: process.id,
+        version: "1.0.0",
+      });
+
+      // Create sandbox version
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "0.2.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.deprecatedVersion).not.toBeNull();
+      expect(result.deprecatedVersion?.id).toBe(existingProduction.id);
+      expect(result.deprecatedVersion?.status).toBe("DEPRECATED");
+
+      // Verify in database
+      const deprecated = await testDb.processVersion.findUnique({
+        where: { id: existingProduction.id },
+      });
+      expect(deprecated?.status).toBe("DEPRECATED");
+      expect(deprecated?.deprecatedAt).not.toBeNull();
+    });
+
+    it("should increment version number correctly", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create some existing versions
+      await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "PRODUCTION",
+        status: "DEPRECATED",
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        version: "2.0.0",
+        environment: "PRODUCTION",
+        status: "DEPRECATED",
+      });
+
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "0.3.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      // Should be 3.0.0 (max was 2.0.0)
+      expect(result.promotedVersion.version).toBe("3.0.0");
+    });
+
+    it("should invalidate cache entries", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      // Create cache entries
+      await testDb.responseCache.createMany({
+        data: [
+          {
+            tenantId: tenant.id,
+            processId: process.id,
+            inputHash: "hash1",
+            response: { test: true },
+            version: "1.0.0",
+            cachedAt: new Date(),
+            expiresAt: new Date(Date.now() + 3600000),
+          },
+          {
+            tenantId: tenant.id,
+            processId: process.id,
+            inputHash: "hash2",
+            response: { test: true },
+            version: "1.0.0",
+            cachedAt: new Date(),
+            expiresAt: new Date(Date.now() + 3600000),
+          },
+        ],
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      expect(result.cacheInvalidated).toBe(2);
+
+      // Verify cache is empty
+      const cacheCount = await testDb.responseCache.count({
+        where: { processId: process.id },
+      });
+      expect(cacheCount).toBe(0);
+    });
+
+    it("should store change notes", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+        changeNotes: "Initial production release with improved prompts",
+      });
+
+      const productionVersion = await testDb.processVersion.findFirst({
+        where: {
+          processId: process.id,
+          environment: "PRODUCTION",
+          status: "ACTIVE",
+        },
+      });
+
+      expect(productionVersion?.changeNotes).toBe(
+        "Initial production release with improved prompts"
+      );
+    });
+
+    it("should create audit log entry", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.promoteToProduction({
+        processId: process.id,
+        versionId: sandboxVersion.id,
+      });
+
+      // Wait briefly for transaction to complete
+      await new Promise((r) => setTimeout(r, 100));
+
+      const auditLog = await testDb.auditLog.findFirst({
+        where: {
+          tenantId: tenant.id,
+          action: "processVersion.promoted",
+          resourceId: result.promotedVersion.id,
+        },
+      });
+
+      expect(auditLog).not.toBeNull();
+      expect((auditLog?.metadata as Record<string, unknown>)?.processId).toBe(
+        process.id
+      );
+      expect((auditLog?.metadata as Record<string, unknown>)?.fromVersionId).toBe(
+        sandboxVersion.id
+      );
+    });
+
+    it("should reject non-sandbox versions", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const productionVersion = await processVersionFactory.createProduction({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.promoteToProduction({
+          processId: process.id,
+          versionId: productionVersion.id,
+        })
+      ).rejects.toThrow("Can only promote SANDBOX versions");
+    });
+
+    it("should reject non-active versions", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const draftVersion = await processVersionFactory.create({
+        processId: process.id,
+        environment: "SANDBOX",
+        status: "DRAFT",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.promoteToProduction({
+          processId: process.id,
+          versionId: draftVersion.id,
+        })
+      ).rejects.toThrow("Can only promote ACTIVE versions");
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(
+        caller.process.promoteToProduction({
+          processId: "proc_test",
+          versionId: "procv_test",
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("should not promote other tenant's process (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      const sandboxVersion = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.promoteToProduction({
+          processId: process.id,
+          versionId: sandboxVersion.id,
+        })
+      ).rejects.toThrow("Version not found");
+    });
+  });
 });

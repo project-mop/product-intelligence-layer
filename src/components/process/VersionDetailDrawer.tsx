@@ -1,10 +1,11 @@
 "use client";
 
-import { GitCompare, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, GitCompare, Loader2, RotateCcw, X } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,28 @@ import {
 import { ChevronDown } from "lucide-react";
 import { EnvironmentBadge } from "./EnvironmentBadge";
 import { useState } from "react";
+
+/** Number of days after deprecation before sunset (MVP warning only) */
+const SUNSET_DAYS = 90;
+
+/**
+ * Calculate sunset date from deprecation date
+ */
+function calculateSunsetDate(deprecatedAt: Date | string): Date {
+  const date = new Date(deprecatedAt);
+  date.setDate(date.getDate() + SUNSET_DAYS);
+  return date;
+}
+
+/**
+ * Calculate days until sunset
+ */
+function daysUntilSunset(deprecatedAt: Date | string): number {
+  const sunsetDate = calculateSunsetDate(deprecatedAt);
+  const now = new Date();
+  const diffMs = sunsetDate.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
 
 export interface VersionDetailDrawerProps {
   /** The process ID */
@@ -160,6 +183,43 @@ export function VersionDetailDrawer({
                   {version.status.toLowerCase()}
                 </Badge>
               </div>
+
+              {/* Story 5.5: Deprecation warning banner */}
+              {version.status === "DEPRECATED" && version.deprecatedAt && (
+                <Alert
+                  variant={daysUntilSunset(version.deprecatedAt) <= 7 ? "destructive" : "default"}
+                  className={
+                    daysUntilSunset(version.deprecatedAt) <= 7
+                      ? undefined
+                      : "border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950"
+                  }
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Version Deprecated</AlertTitle>
+                  <AlertDescription>
+                    This version was deprecated on{" "}
+                    {formatDate(version.deprecatedAt)}.
+                    {(() => {
+                      const days = daysUntilSunset(version.deprecatedAt);
+                      const sunsetDate = calculateSunsetDate(version.deprecatedAt);
+                      const sunsetStr = sunsetDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+                      if (days <= 0) {
+                        return ` This version is past its sunset date (${sunsetStr}).`;
+                      } else if (days === 1) {
+                        return " Sunset is tomorrow.";
+                      } else if (days <= 7) {
+                        return ` Sunset in ${days} days (${sunsetStr}).`;
+                      } else {
+                        return ` Sunset date: ${sunsetStr}.`;
+                      }
+                    })()}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <Separator />

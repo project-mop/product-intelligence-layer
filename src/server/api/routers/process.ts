@@ -28,6 +28,7 @@ import { logger } from "~/lib/logger";
 import { promoteToProduction, getPromotionPreview } from "~/server/services/process/promotion";
 import { compareVersions } from "~/server/services/process/version-diff";
 import { rollbackToVersion } from "~/server/services/process/rollback";
+import { getAvailableVersions } from "~/server/services/process/version-resolver";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -1779,6 +1780,72 @@ export const processRouter = createTRPCRouter({
               deprecatedAt: result.deprecatedVersion.deprecatedAt,
             }
           : null,
+      };
+    }),
+
+  /**
+   * Get available versions for a process.
+   *
+   * Story 5.5 AC: 7 - Returns available versions for error responses.
+   * Useful for API consumers to see what versions are available.
+   *
+   * @returns { sandbox: number[], production: number[] }
+   */
+  getAvailableVersions: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        environment: z.enum(["SANDBOX", "PRODUCTION"]).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Verify process exists and belongs to tenant
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Get available versions using version resolver service
+      const available = await getAvailableVersions(
+        input.processId,
+        tenantId,
+        input.environment
+      );
+
+      // If environment filter is specified, return just that environment's versions
+      if (input.environment) {
+        const versions = input.environment === "SANDBOX"
+          ? available.sandbox
+          : available.production;
+        return {
+          versions,
+          environment: input.environment,
+        };
+      }
+
+      // Return all versions by environment
+      return {
+        sandbox: available.sandbox,
+        production: available.production,
       };
     }),
 });

@@ -1,0 +1,223 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>5</storyId>
+    <title>Version Pinning and Deprecation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-5-version-pinning-and-deprecation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>API consumer</asA>
+    <iWant>to pin to a specific version and receive deprecation warnings</iWant>
+    <soThat>my integrations don't break unexpectedly when new versions are promoted</soThat>
+    <tasks>
+      <task id="1" acs="1,2,3,7,8">Enhance version resolver service - add version pinning support with error handling</task>
+      <task id="2" acs="4,5,6,9,10">Create version response headers utility - build deprecation and version metadata headers</task>
+      <task id="3" acs="1">Extract version header from API request - parse X-Version header</task>
+      <task id="4" acs="1-10">Update intelligence API route with version pinning - integrate headers in both endpoints</task>
+      <task id="5" acs="7,8">Create version pinning error responses - VERSION_NOT_FOUND, VERSION_ENVIRONMENT_MISMATCH</task>
+      <task id="6" acs="6">Add sunset date calculation - 90 days from deprecation</task>
+      <task id="7" acs="7">Update process router with version info endpoint - getAvailableVersions</task>
+      <task id="8" acs="4,5,6">Add deprecation badge to version UI - VersionHistoryTable, VersionDetailDrawer</task>
+      <task id="9" acs="1-8">Write unit tests for version resolver</task>
+      <task id="10" acs="4,5,6,9,10">Write unit tests for version headers</task>
+      <task id="11" acs="1-10">Write integration tests for version pinning</task>
+      <task id="12">Write integration tests for public API version headers</task>
+      <task id="13" acs="4,5,6,9,10">Update API documentation</task>
+      <task id="14" acs="1-10">Verification - typecheck, lint, tests, build</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">API consumers can pin to specific version via X-Version: N header (FR-311)</ac>
+    <ac id="2">Without X-Version header, latest ACTIVE version for environment is used</ac>
+    <ac id="3">Pinned requests to deprecated versions succeed but include warning headers</ac>
+    <ac id="4">Deprecated version response includes X-Deprecated: true header (FR-312)</ac>
+    <ac id="5">Deprecated version response includes X-Deprecated-Message with upgrade guidance</ac>
+    <ac id="6">Deprecated version response includes X-Sunset-Date header (90 days from deprecation)</ac>
+    <ac id="7">Pinning to non-existent version returns 404 with available versions in error</ac>
+    <ac id="8">Pinning to wrong environment's version returns 403</ac>
+    <ac id="9">Response always includes X-Version header showing resolved version number</ac>
+    <ac id="10">Response includes X-Version-Status header (active/deprecated)</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification: Environments &amp; Versioning</title>
+        <section>Story 5.5: Version Pinning and Deprecation</section>
+        <snippet>FR-311: Pin to specific version via X-Version header. FR-312: Deprecation warnings via X-Deprecated header with sunset guidance. Version resolution flow, header specifications, error handling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Intelligence Generation Flow, Process Version Lifecycle</section>
+        <snippet>Request flow: API Key Auth → Environment Check → Rate Limit → Input Validation → Cache → LLM. Version states: CREATED → SANDBOX → PRODUCTION → DEPRECATED. Only ONE version per process can be PRODUCTION at a time.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Patterns, Integration Tests</section>
+        <snippet>Unit tests with Vitest, integration tests with real database. Use testDb for database access, createAuthenticatedCaller for tRPC tests. 90% coverage threshold.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/5-4-version-history-and-rollback.md</path>
+        <title>Story 5.4: Version History and Rollback</title>
+        <section>Dev Agent Record</section>
+        <snippet>Version resolver patterns in version-resolver.ts, process router endpoints added, VersionHistoryTable and VersionDetailDrawer components created. Test patterns in process-router.test.ts.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/server/services/process/version-resolver.ts</path>
+        <kind>service</kind>
+        <symbol>resolveVersion, ResolveVersionParams, ResolvedVersion</symbol>
+        <lines>1-182</lines>
+        <reason>EXTEND - Main service to modify for version pinning support. Currently supports pinnedVersion parameter but uses semver format. Needs to use integer version numbers and add error handling for VERSION_NOT_FOUND and VERSION_ENVIRONMENT_MISMATCH.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <lines>1-365</lines>
+        <reason>MODIFY - Production endpoint. Add X-Version header parsing, pass pinnedVersion to resolveVersion, add version response headers to all responses.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <reason>MODIFY - Sandbox endpoint. Same changes as production endpoint for version pinning support.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/errors.ts</path>
+        <kind>utility</kind>
+        <symbol>ErrorCode, ApiError, ERROR_HTTP_STATUS</symbol>
+        <lines>1-254</lines>
+        <reason>MODIFY - Add VERSION_NOT_FOUND and VERSION_ENVIRONMENT_MISMATCH error codes with appropriate HTTP status codes (404 and 403).</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>router</kind>
+        <symbol>processRouter, getHistory, getVersionDetails, diff, rollback</symbol>
+        <lines>1-1785</lines>
+        <reason>MODIFY - Add getAvailableVersions endpoint to return available versions for error responses. Contains version management patterns from Story 5.4.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/process/VersionHistoryTable.tsx</path>
+        <kind>component</kind>
+        <symbol>VersionHistoryTable, VersionHistoryEntry</symbol>
+        <lines>1-186</lines>
+        <reason>MODIFY - Add deprecation badge with sunset date tooltip for deprecated versions. Currently shows environment, status, and "Current" badge.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/process/VersionDetailDrawer.tsx</path>
+        <kind>component</kind>
+        <symbol>VersionDetailDrawer</symbol>
+        <lines>1-331</lines>
+        <reason>MODIFY - Add deprecation warning banner for deprecated versions. Show sunset date prominently.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/process-router.test.ts</path>
+        <kind>test</kind>
+        <symbol>Story 5.4 tests</symbol>
+        <reason>MODIFY - Add Story 5.5 test suite for version pinning and deprecation headers.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>@prisma/client</package>
+        <version>^7.0.1</version>
+        <purpose>Database access for ProcessVersion model</purpose>
+      </node>
+      <node>
+        <package>zod</package>
+        <version>^3.24.2</version>
+        <purpose>Input validation for tRPC endpoints</purpose>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^4.0.14</version>
+        <purpose>Unit and integration testing</purpose>
+      </node>
+      <node>
+        <package>next</package>
+        <version>^15.2.3</version>
+        <purpose>API route handling with NextRequest/NextResponse</purpose>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Version pinning cannot bypass environment restrictions - sandbox keys cannot access production versions</constraint>
+    <constraint>Tenant isolation enforced - cannot pin to other tenant's versions</constraint>
+    <constraint>Invalid version header returns informative error (not stack trace)</constraint>
+    <constraint>Available versions in error only shows versions for requesting tenant</constraint>
+    <constraint>Deprecated versions continue serving requests (no hard cutoff in MVP)</constraint>
+    <constraint>Sunset date is informational warning only (90 days from deprecation)</constraint>
+    <constraint>ProcessVersion.version field uses semver strings like "1.0.0" - integer version number extracted from first segment</constraint>
+    <constraint>API routes use Next.js 15 App Router pattern with async params</constraint>
+    <constraint>All database queries must filter by tenantId for tenant isolation</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Version Response Headers</name>
+      <kind>HTTP Headers</kind>
+      <signature>X-Version: string, X-Version-Status: "active"|"deprecated", X-Environment: "sandbox"|"production", X-Deprecated?: "true", X-Deprecated-Message?: string, X-Sunset-Date?: string (ISO 8601)</signature>
+      <path>src/server/services/process/version-headers.ts (CREATE)</path>
+    </interface>
+    <interface>
+      <name>Version Resolution Result (Extended)</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface VersionResolutionResult { version: ProcessVersion; isPinned: boolean; isDeprecated: boolean; sunsetDate: Date | null; availableVersions?: number[] }</signature>
+      <path>src/server/services/process/version-resolver.ts</path>
+    </interface>
+    <interface>
+      <name>X-Version Header Parser</name>
+      <kind>Function</kind>
+      <signature>function parseVersionHeader(request: Request): number | undefined</signature>
+      <path>src/server/services/process/parse-version-header.ts (CREATE)</path>
+    </interface>
+    <interface>
+      <name>Sunset Date Calculator</name>
+      <kind>Function</kind>
+      <signature>function calculateSunsetDate(deprecatedAt: Date): Date, function isBeyondSunset(deprecatedAt: Date): boolean</signature>
+      <path>src/server/services/process/sunset.ts (CREATE)</path>
+    </interface>
+    <interface>
+      <name>getAvailableVersions tRPC Endpoint</name>
+      <kind>tRPC Query</kind>
+      <signature>input: { processId: string, environment?: "SANDBOX"|"PRODUCTION" }, output: { sandbox: number[], production: number[] }</signature>
+      <path>src/server/api/routers/process.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with mocked dependencies. Integration tests use real PostgreSQL database with automatic cleanup via testDb. Use createAuthenticatedCaller for tRPC tests. Coverage threshold is 90% lines, 70% functions. Tests follow Arrange-Act-Assert pattern with descriptive names.
+    </standards>
+    <locations>
+      <location>tests/unit/server/services/process/version-resolver.test.ts (CREATE)</location>
+      <location>tests/unit/server/services/process/version-headers.test.ts (CREATE)</location>
+      <location>tests/integration/process-router.test.ts (MODIFY - add Story 5.5 suite)</location>
+      <location>tests/integration/intelligence-api-versioning.test.ts (CREATE)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test: Request with valid X-Version header resolves to specified version number</idea>
+      <idea ac="2">Test: Request without X-Version header gets latest ACTIVE version for environment</idea>
+      <idea ac="3">Test: Pinned request to deprecated version succeeds with deprecation headers</idea>
+      <idea ac="4">Test: X-Deprecated header is "true" string for deprecated versions</idea>
+      <idea ac="5">Test: X-Deprecated-Message contains latest version number and upgrade guidance</idea>
+      <idea ac="6">Test: X-Sunset-Date is 90 days from deprecatedAt in ISO 8601 format</idea>
+      <idea ac="7">Test: Non-existent version returns 404 with VERSION_NOT_FOUND code and availableVersions array</idea>
+      <idea ac="8">Test: Production endpoint with sandbox-only version returns 403 VERSION_ENVIRONMENT_MISMATCH</idea>
+      <idea ac="9">Test: All responses include X-Version header with resolved version number</idea>
+      <idea ac="10">Test: X-Version-Status is "active" for active versions, "deprecated" for deprecated</idea>
+      <idea ac="tenant">Test: Cannot access versions from other tenant</idea>
+    </ideas>
+  </tests>
+</story-context>

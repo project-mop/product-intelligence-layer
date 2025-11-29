@@ -42,6 +42,14 @@ export enum ErrorCode {
   /** @deprecated Use RATE_LIMITED instead */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   RATE_LIMIT_EXCEEDED = "RATE_LIMITED",
+  /** Version not found (Story 5.5) */
+  VERSION_NOT_FOUND = "VERSION_NOT_FOUND",
+  /** Version environment mismatch (Story 5.5) */
+  VERSION_ENVIRONMENT_MISMATCH = "VERSION_ENVIRONMENT_MISMATCH",
+  /** No active version available (Story 5.5) */
+  NO_ACTIVE_VERSION = "NO_ACTIVE_VERSION",
+  /** Invalid version header format (Story 5.5) */
+  INVALID_VERSION = "INVALID_VERSION",
 }
 
 /**
@@ -65,6 +73,10 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   [ErrorCode.OUTPUT_VALIDATION_FAILED]: 500, // Server error per AC #7
   [ErrorCode.INVALID_INPUT]: 400,
   [ErrorCode.RATE_LIMITED]: 429,
+  [ErrorCode.VERSION_NOT_FOUND]: 404, // Story 5.5 AC: 7
+  [ErrorCode.VERSION_ENVIRONMENT_MISMATCH]: 403, // Story 5.5 AC: 8
+  [ErrorCode.NO_ACTIVE_VERSION]: 404, // Story 5.5
+  [ErrorCode.INVALID_VERSION]: 400, // Story 5.5 - bad X-Version header
 };
 
 /**

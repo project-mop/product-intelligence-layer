@@ -1,0 +1,198 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>4</storyId>
+    <title>Version History and Rollback</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-4-version-history-and-rollback.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to view version history and roll back to previous versions</iWant>
+    <soThat>I can recover from bad deployments and track changes over time</soThat>
+    <tasks>
+      <task id="1" acs="1,2,3,4">Create version history tRPC endpoints (getHistory, getVersionDetails)</task>
+      <task id="2" acs="5,6">Create version diff service</task>
+      <task id="3" acs="5">Add version diff tRPC endpoint</task>
+      <task id="4" acs="7,8,9,10">Create rollback service</task>
+      <task id="5" acs="7,8">Add rollback tRPC endpoint</task>
+      <task id="6" acs="1,2,3">Create VersionHistory page component</task>
+      <task id="7" acs="2,3">Create VersionHistoryTable component</task>
+      <task id="8" acs="4">Create VersionDetailDrawer component</task>
+      <task id="9" acs="5,6">Create VersionCompareDialog component</task>
+      <task id="10" acs="6">Create VersionDiffView component</task>
+      <task id="11" acs="7,8,9">Create RollbackConfirmDialog component</task>
+      <task id="12" acs="1">Integrate version history into process detail page</task>
+      <task id="13" acs="8">Add audit logging for rollback</task>
+      <task id="14" acs="5,6">Write unit tests for version diff service</task>
+      <task id="15" acs="7,8,9,10">Write unit tests for rollback service</task>
+      <task id="16" acs="1-10">Write integration tests for version history</task>
+      <task id="17" acs="all">Update factories for version history testing</task>
+      <task id="18" acs="1-10">Verification (typecheck, lint, tests, build, manual)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1" ref="FR-302">Version history page accessible from process detail view</criterion>
+    <criterion id="2">Version history shows list with: version number, date, environment, status, change notes</criterion>
+    <criterion id="3">Each version row shows "Current" badge if it's the active version for its environment</criterion>
+    <criterion id="4">Clicking a version shows full configuration details</criterion>
+    <criterion id="5">Compare button allows selecting two versions for side-by-side diff</criterion>
+    <criterion id="6">Diff view highlights: added fields (green), removed fields (red), modified fields (yellow)</criterion>
+    <criterion id="7" ref="FR-305">Restore this version button available on any non-current version</criterion>
+    <criterion id="8" ref="FR-309">Rollback creates new sandbox version copying config from target version</criterion>
+    <criterion id="9">Rollback sets changeNotes to "Restored from version X"</criterion>
+    <criterion id="10">Version numbers auto-increment (never reuse numbers)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-5.md" title="Epic 5 Technical Specification" section="Story 5.4: Version History and Rollback">
+        Defines FR-302 (view version history), FR-305 (rollback to previous version), FR-309 (immutable production versions). Includes VersionHistoryEntry type, VersionDiff interface, rollback workflow, and acceptance criteria.
+      </doc>
+      <doc path="docs/tech-spec-epic-5.md" title="Epic 5 Technical Specification" section="Data Models and Contracts">
+        ProcessVersion model with environment, status, publishedAt, deprecatedAt, changeNotes, promotedBy fields. Version numbers are monotonically increasing integers.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Process Version Lifecycle">
+        SANDBOX → promote → PRODUCTION → deprecated state machine. Only ONE version per process can be active in PRODUCTION. Version rollback creates NEW sandbox version, preserving immutable history.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Permission Checking Patterns">
+        Tenant isolation patterns for tRPC routers. Always filter by tenantId in WHERE clauses. Use protectedProcedure for authenticated routes.
+      </doc>
+      <doc path="docs/testing-strategy-mvp.md" title="Testing Strategy" section="Test Patterns">
+        Unit tests with Vitest for services. Integration tests for tRPC routers with real database. Use factories for test data. Coverage: 90% lines minimum.
+      </doc>
+      <doc path="docs/stories/5-3-promote-to-production.md" title="Story 5.3: Promote to Production" section="Dev Agent Record">
+        Learnings: promotion.ts for atomic transactions, version-diff.ts for comparing versions, VersionDiffView component for diff display. These components exist and should be REUSED.
+      </doc>
+    </docs>
+    <code>
+      <!-- REUSE: Version diff service from Story 5.3 -->
+      <artifact path="src/server/services/process/version-diff.ts" kind="service" symbol="compareVersions">
+        REUSE - Existing version diff service. Compares two ProcessVersion objects and returns VersionDiff with changes, summary, hasChanges, changeCount. Also exports formatFieldPath and formatValueForDisplay helpers.
+      </artifact>
+      <artifact path="src/server/services/process/promotion.ts" kind="service" symbol="promoteToProduction">
+        REFERENCE - Pattern for atomic transactions with Prisma. Shows how to deprecate old version, create new version, invalidate cache, and create audit log in single transaction.
+      </artifact>
+      <!-- REUSE: UI components from Story 5.3 -->
+      <artifact path="src/components/process/VersionDiffView.tsx" kind="component" symbol="VersionDiffView">
+        REUSE - Existing component for displaying version diffs. Shows changes with color coding (green=added, red=removed, yellow=modified). Collapsible with summary.
+      </artifact>
+      <artifact path="src/components/process/PromotionConfirmDialog.tsx" kind="component" symbol="PromotionConfirmDialog">
+        REFERENCE - Pattern for confirmation dialogs with preview data fetching, warning banners, and optional notes input.
+      </artifact>
+      <artifact path="src/components/process/PromoteButton.tsx" kind="component" symbol="PromoteButton">
+        REFERENCE - Pattern for action buttons that check version state before enabling.
+      </artifact>
+      <artifact path="src/components/process/EnvironmentBadge.tsx" kind="component" symbol="EnvironmentBadge">
+        REUSE - Badge component for displaying environment (SANDBOX=yellow, PRODUCTION=green).
+      </artifact>
+      <!-- Router to extend -->
+      <artifact path="src/server/api/routers/process.ts" kind="router" symbol="processRouter" lines="1182-1264">
+        MODIFY - Existing process router. Has listVersions, getActiveVersion, getPromotionPreview, promoteToProduction. Add getHistory, getVersionDetails, diff, rollback endpoints.
+      </artifact>
+      <!-- Page to modify -->
+      <artifact path="src/app/dashboard/processes/[id]/page.tsx" kind="page" symbol="ProcessDetailPage">
+        MODIFY - Process detail page. Add "Version History" link/tab. Currently shows versions list inline, needs enhancement.
+      </artifact>
+      <!-- Factory to extend -->
+      <artifact path="tests/support/factories/process-version.factory.ts" kind="factory" symbol="processVersionFactory">
+        EXTEND - Has build, create, createWithProcess, createMany, createProduction, createDeprecated, createActiveSandbox. Verify supports changeNotes and promotedBy fields.
+      </artifact>
+      <!-- Audit service -->
+      <artifact path="src/server/services/audit/index.ts" kind="service" symbol="createAuditLog">
+        REUSE - Audit logging function. Used by promotion service, follow same pattern for rollback.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@trpc/server" version="^11.0.0">tRPC server for router endpoints</package>
+        <package name="@prisma/client" version="^7.0.1">Database ORM for ProcessVersion queries</package>
+        <package name="zod" version="^3.24.2">Input validation for tRPC endpoints</package>
+        <package name="lucide-react" version="^0.555.0">Icons for UI components</package>
+        <package name="@radix-ui/react-dialog" version="^1.1.15">Dialog component for compare and rollback</package>
+        <package name="@radix-ui/react-collapsible" version="^1.1.12">Collapsible for diff view</package>
+      </node>
+      <internal>
+        <dep>Environment enum from Prisma schema (SANDBOX, PRODUCTION)</dep>
+        <dep>VersionStatus enum from Prisma schema (DRAFT, ACTIVE, DEPRECATED)</dep>
+        <dep>ProcessVersion model from Prisma schema</dep>
+        <dep>version-diff.ts service (REUSE from Story 5.3)</dep>
+        <dep>VersionDiffView component (REUSE from Story 5.3)</dep>
+        <dep>Cache service for potential invalidation on rollback</dep>
+        <dep>Audit logging from Story 1.5</dep>
+      </internal>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Version numbers are monotonically increasing integers - NEVER reuse numbers, even after rollback</constraint>
+    <constraint type="architecture">Rollback creates NEW sandbox version with copied config - does NOT modify or delete any existing version</constraint>
+    <constraint type="architecture">Production versions are immutable - cannot be edited, only deprecated</constraint>
+    <constraint type="architecture">Only ONE version per process can be ACTIVE in each environment (SANDBOX, PRODUCTION)</constraint>
+    <constraint type="security">All queries must include tenantId filter for tenant isolation</constraint>
+    <constraint type="security">Verify user owns the process before any version operations</constraint>
+    <constraint type="data">Rollback transaction must be atomic - use Prisma $transaction</constraint>
+    <constraint type="audit">Create audit log entry for rollback operations</constraint>
+    <constraint type="naming">New audit action: "processVersion.rollback" following existing pattern</constraint>
+    <constraint type="ui">Version strings use semantic versioning format "X.Y.Z" (not integers)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="VersionHistoryEntry" kind="type" path="src/server/services/process/types.ts">
+      Extended version data with computed fields: id, version, environment, status, createdAt, publishedAt, deprecatedAt, changeNotes, promotedBy, isCurrent (computed), canPromote (computed), canRollback (computed)
+    </interface>
+    <interface name="VersionDiff" kind="type" path="src/server/services/process/version-diff.ts">
+      EXISTING - { changes: VersionChange[], summary: string, hasChanges: boolean, changeCount: { added, removed, modified } }
+    </interface>
+    <interface name="VersionChange" kind="type" path="src/server/services/process/version-diff.ts">
+      EXISTING - { path: string, type: "added"|"removed"|"modified", oldValue: unknown, newValue: unknown }
+    </interface>
+    <interface name="RollbackInput" kind="type" path="src/server/services/process/rollback.ts">
+      NEW - { processId: string, targetVersionId: string, changeNotes?: string }
+    </interface>
+    <interface name="RollbackResult" kind="type" path="src/server/services/process/rollback.ts">
+      NEW - { newVersion: ProcessVersion, sourceVersion: ProcessVersion, deprecatedVersion: ProcessVersion | null }
+    </interface>
+    <interface name="process.getHistory" kind="tRPC" path="src/server/api/routers/process.ts">
+      NEW - Input: { processId, limit?, offset? }. Returns VersionHistoryEntry[] with computed fields.
+    </interface>
+    <interface name="process.getVersionDetails" kind="tRPC" path="src/server/api/routers/process.ts">
+      NEW - Input: { processId, versionId }. Returns full ProcessVersion with config and schemas.
+    </interface>
+    <interface name="process.diff" kind="tRPC" path="src/server/api/routers/process.ts">
+      NEW - Input: { processId, version1Id, version2Id }. Returns VersionDiff.
+    </interface>
+    <interface name="process.rollback" kind="tRPC" path="src/server/api/routers/process.ts">
+      NEW - Input: { processId, targetVersionId, changeNotes? }. Returns RollbackResult.
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests with Vitest for rollback service logic. Integration tests for tRPC endpoints using real database. Use existing processVersionFactory for test data. Follow Story 5.3 test patterns. Coverage threshold: 90% lines, 70% functions.
+    </standards>
+    <locations>
+      <location>tests/unit/server/services/process/rollback.test.ts - Unit tests for rollback service</location>
+      <location>tests/integration/process-router.test.ts - Add Story 5.4 describe block for version history/rollback endpoints</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test: getHistory returns all versions for process in descending order</idea>
+      <idea ac="2,3">Test: getHistory includes computed fields (isCurrent, canPromote, canRollback)</idea>
+      <idea ac="4">Test: getVersionDetails returns full config and schemas</idea>
+      <idea ac="5">Test: diff returns changes between two versions</idea>
+      <idea ac="6">Test: diff correctly categorizes added/removed/modified (use version-diff.test.ts patterns)</idea>
+      <idea ac="7">Test: rollback rejects if target is current sandbox version</idea>
+      <idea ac="8">Test: rollback creates new SANDBOX ACTIVE version with copied config</idea>
+      <idea ac="8">Test: rollback deprecates previous sandbox version if exists</idea>
+      <idea ac="9">Test: rollback sets default changeNotes "Restored from version X"</idea>
+      <idea ac="9">Test: rollback uses custom changeNotes when provided</idea>
+      <idea ac="10">Test: rollback increments version number correctly (never reuses)</idea>
+      <idea ac="all">Test: Tenant isolation - cannot view/rollback other tenant's versions</idea>
+      <idea ac="all">Test: Audit log entry created for rollback</idea>
+    </ideas>
+  </tests>
+</story-context>

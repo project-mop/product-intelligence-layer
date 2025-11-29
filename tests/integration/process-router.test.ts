@@ -2515,4 +2515,613 @@ describe("process Router", () => {
       ).rejects.toThrow("Version not found");
     });
   });
+
+  /**
+   * Story 5.4: Version History and Rollback
+   *
+   * Tests for viewing version history, comparing versions, and rolling back.
+   */
+  describe("getHistory (Story 5.4)", () => {
+    it("should return all versions for a process ordered by createdAt desc", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create multiple versions with different timestamps
+      await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "SANDBOX",
+        createdAt: new Date("2024-01-01"),
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        version: "2.0.0",
+        environment: "PRODUCTION",
+        createdAt: new Date("2024-02-01"),
+      });
+      await processVersionFactory.create({
+        processId: process.id,
+        version: "3.0.0",
+        environment: "SANDBOX",
+        createdAt: new Date("2024-03-01"),
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getHistory({ processId: process.id });
+
+      expect(result.versions).toHaveLength(3);
+      expect(result.versions[0]?.version).toBe("3.0.0"); // Newest first
+      expect(result.versions[2]?.version).toBe("1.0.0"); // Oldest last
+      expect(result.totalCount).toBe(3);
+    });
+
+    it("should include computed fields (isCurrent, canPromote, canRollback)", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const activeSandbox = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "2.0.0",
+      });
+      const activeProduction = await processVersionFactory.createProduction({
+        processId: process.id,
+        version: "1.0.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getHistory({ processId: process.id });
+
+      const sandboxEntry = result.versions.find((v) => v.id === activeSandbox.id);
+      const productionEntry = result.versions.find((v) => v.id === activeProduction.id);
+
+      // Active sandbox should be marked as current and promotable
+      expect(sandboxEntry?.isCurrent).toBe(true);
+      expect(sandboxEntry?.canPromote).toBe(true);
+      expect(sandboxEntry?.canRollback).toBe(false); // Can't rollback to current sandbox
+
+      // Active production should be marked as current but not promotable
+      expect(productionEntry?.isCurrent).toBe(true);
+      expect(productionEntry?.canPromote).toBe(false);
+      expect(productionEntry?.canRollback).toBe(true); // Can rollback to production
+    });
+
+    it("should support pagination with offset and limit", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create 5 versions
+      for (let i = 1; i <= 5; i++) {
+        await processVersionFactory.create({
+          processId: process.id,
+          version: `${i}.0.0`,
+          createdAt: new Date(`2024-0${i}-01`),
+        });
+      }
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getHistory({
+        processId: process.id,
+        limit: 2,
+        offset: 1,
+      });
+
+      expect(result.versions).toHaveLength(2);
+      expect(result.totalCount).toBe(5);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it("should throw NOT_FOUND for non-existent process", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.getHistory({ processId: "proc_nonexistent" })
+      ).rejects.toThrow("Process not found");
+    });
+
+    it("should not return history for other tenant's process (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      await processVersionFactory.create({ processId: process.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.getHistory({ processId: process.id })
+      ).rejects.toThrow("Process not found");
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(
+        caller.process.getHistory({ processId: "proc_test" })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
+
+  describe("getVersionDetails (Story 5.4)", () => {
+    it("should return full version details with config", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+        config: {
+          systemPrompt: "Test prompt",
+          temperature: 0.8,
+          maxTokens: 2048,
+        },
+        changeNotes: "Test version",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getVersionDetails({
+        processId: process.id,
+        versionId: version.id,
+      });
+
+      expect(result.id).toBe(version.id);
+      expect(result.config).toEqual({
+        systemPrompt: "Test prompt",
+        temperature: 0.8,
+        maxTokens: 2048,
+      });
+      expect(result.changeNotes).toBe("Test version");
+      expect(result.process.id).toBe(process.id);
+    });
+
+    it("should include process schemas in version details", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const inputSchema = { type: "object", properties: { input: { type: "string" } } };
+      const outputSchema = { type: "object", properties: { output: { type: "string" } } };
+      const process = await processFactory.create({
+        tenantId: tenant.id,
+        inputSchema,
+        outputSchema,
+      });
+      const version = await processVersionFactory.create({ processId: process.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.getVersionDetails({
+        processId: process.id,
+        versionId: version.id,
+      });
+
+      expect(result.process.inputSchema).toEqual(inputSchema);
+      expect(result.process.outputSchema).toEqual(outputSchema);
+    });
+
+    it("should throw NOT_FOUND for non-existent version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.getVersionDetails({
+          processId: process.id,
+          versionId: "procv_nonexistent",
+        })
+      ).rejects.toThrow("Version not found");
+    });
+
+    it("should throw NOT_FOUND for other tenant's version", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      const version = await processVersionFactory.create({ processId: process.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.getVersionDetails({
+          processId: process.id,
+          versionId: version.id,
+        })
+      ).rejects.toThrow("Version not found");
+    });
+  });
+
+  describe("diff (Story 5.4)", () => {
+    it("should return diff between two versions", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const version1 = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        config: { systemPrompt: "Original prompt", temperature: 0.7 },
+      });
+      const version2 = await processVersionFactory.create({
+        processId: process.id,
+        version: "2.0.0",
+        config: { systemPrompt: "Updated prompt", temperature: 0.9 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.diff({
+        processId: process.id,
+        version1Id: version1.id,
+        version2Id: version2.id,
+      });
+
+      expect(result.hasChanges).toBe(true);
+      expect(result.changeCount.modified).toBeGreaterThan(0);
+      expect(result.version1.version).toBe("1.0.0");
+      expect(result.version2.version).toBe("2.0.0");
+    });
+
+    it("should return no changes for identical configs", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const config = { systemPrompt: "Same prompt", temperature: 0.7 };
+      const version1 = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        config,
+      });
+      const version2 = await processVersionFactory.create({
+        processId: process.id,
+        version: "2.0.0",
+        config,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.diff({
+        processId: process.id,
+        version1Id: version1.id,
+        version2Id: version2.id,
+      });
+
+      expect(result.hasChanges).toBe(false);
+      expect(result.summary).toBe("No changes detected");
+    });
+
+    it("should throw NOT_FOUND when version1 doesn't exist", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version2 = await processVersionFactory.create({ processId: process.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.diff({
+          processId: process.id,
+          version1Id: "procv_nonexistent",
+          version2Id: version2.id,
+        })
+      ).rejects.toThrow("Version 1 not found");
+    });
+
+    it("should throw NOT_FOUND when version2 doesn't exist", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version1 = await processVersionFactory.create({ processId: process.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.diff({
+          processId: process.id,
+          version1Id: version1.id,
+          version2Id: "procv_nonexistent",
+        })
+      ).rejects.toThrow("Version 2 not found");
+    });
+  });
+
+  describe("rollback (Story 5.4)", () => {
+    it("should create new sandbox version from target version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      // Create initial production version
+      const targetVersion = await processVersionFactory.createProduction({
+        processId: process.id,
+        version: "1.0.0",
+        config: { systemPrompt: "Production prompt", temperature: 0.7 },
+      });
+
+      // Create current sandbox
+      await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "2.0.0",
+        config: { systemPrompt: "Sandbox prompt", temperature: 0.9 },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+      });
+
+      // New version should be SANDBOX with copied config
+      expect(result.newVersion.environment).toBe("SANDBOX");
+      expect(result.newVersion.status).toBe("ACTIVE");
+      expect(result.sourceVersion.id).toBe(targetVersion.id);
+      expect(result.deprecatedVersion).not.toBeNull();
+
+      // Verify new version has next version number
+      const newVersionNumber = parseInt(result.newVersion.version.split(".")[0] ?? "0", 10);
+      expect(newVersionNumber).toBe(3); // max was 2, so new is 3
+    });
+
+    it("should copy config from target version to new version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const targetConfig = {
+        systemPrompt: "Restore this prompt",
+        temperature: 0.5,
+        maxTokens: 512,
+      };
+
+      const targetVersion = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "PRODUCTION",
+        status: "DEPRECATED",
+        config: targetConfig,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+      });
+
+      // Verify config was copied
+      const newVersion = await testDb.processVersion.findUnique({
+        where: { id: result.newVersion.id },
+      });
+      expect(newVersion?.config).toEqual(targetConfig);
+    });
+
+    it("should deprecate current active sandbox version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const targetVersion = await processVersionFactory.createProduction({
+        processId: process.id,
+        version: "1.0.0",
+      });
+
+      const currentSandbox = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "2.0.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+      });
+
+      expect(result.deprecatedVersion?.id).toBe(currentSandbox.id);
+      expect(result.deprecatedVersion?.status).toBe("DEPRECATED");
+
+      // Verify in database
+      const deprecated = await testDb.processVersion.findUnique({
+        where: { id: currentSandbox.id },
+      });
+      expect(deprecated?.status).toBe("DEPRECATED");
+      expect(deprecated?.deprecatedAt).not.toBeNull();
+    });
+
+    it("should store custom change notes", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const targetVersion = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+        changeNotes: "Rolling back due to bug in v2",
+      });
+
+      expect(result.newVersion.changeNotes).toBe("Rolling back due to bug in v2");
+    });
+
+    it("should use default change notes when not provided", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const targetVersion = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+      });
+
+      expect(result.newVersion.changeNotes).toBe("Restored from version 1.0.0");
+    });
+
+    it("should reject rollback to current active sandbox", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const currentSandbox = await processVersionFactory.createActiveSandbox({
+        processId: process.id,
+        version: "1.0.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.rollback({
+          processId: process.id,
+          targetVersionId: currentSandbox.id,
+        })
+      ).rejects.toThrow("Cannot rollback to the current active sandbox version");
+    });
+
+    it("should create audit log entry", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const targetVersion = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+        environment: "PRODUCTION",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.process.rollback({
+        processId: process.id,
+        targetVersionId: targetVersion.id,
+      });
+
+      // Wait for transaction to complete
+      await new Promise((r) => setTimeout(r, 100));
+
+      const auditLog = await testDb.auditLog.findFirst({
+        where: {
+          tenantId: tenant.id,
+          action: "processVersion.rollback",
+          resourceId: result.newVersion.id,
+        },
+      });
+
+      expect(auditLog).not.toBeNull();
+      expect((auditLog?.metadata as Record<string, unknown>)?.sourceVersionId).toBe(
+        targetVersion.id
+      );
+    });
+
+    it("should throw NOT_FOUND for non-existent version", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      await expect(
+        caller.process.rollback({
+          processId: process.id,
+          targetVersionId: "procv_nonexistent",
+        })
+      ).rejects.toThrow("Version not found");
+    });
+
+    it("should not rollback other tenant's process (isolation)", async () => {
+      const { user: user1, tenant: tenant1 } = await userFactory.createWithTenant();
+      const tenant2 = await tenantFactory.create({ name: "Other Tenant" });
+      const process = await processFactory.create({ tenantId: tenant2.id });
+      const targetVersion = await processVersionFactory.create({
+        processId: process.id,
+        version: "1.0.0",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user1.id,
+        tenantId: tenant1.id,
+      });
+
+      await expect(
+        caller.process.rollback({
+          processId: process.id,
+          targetVersionId: targetVersion.id,
+        })
+      ).rejects.toThrow("Version not found");
+    });
+
+    it("should reject unauthenticated requests", async () => {
+      const caller = createUnauthenticatedCaller();
+
+      await expect(
+        caller.process.rollback({
+          processId: "proc_test",
+          targetVersionId: "procv_test",
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
 });

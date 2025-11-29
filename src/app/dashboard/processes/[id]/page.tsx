@@ -3,7 +3,7 @@
 import { use, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Loader2, FileText, Play, FileJson } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, FileText, Play, FileJson, History } from "lucide-react";
 
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -327,8 +327,17 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
 
         {/* Versions */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Versions</CardTitle>
+            {/* Story 5.4 AC: 1 - Version history link */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/dashboard/processes/${processId}/versions`)}
+            >
+              <History className="h-4 w-4 mr-2" />
+              View History
+            </Button>
           </CardHeader>
           <CardContent>
             {process.versions.length === 0 ? (

@@ -27,6 +27,7 @@ import { getCacheService } from "~/server/services/cache";
 import { logger } from "~/lib/logger";
 import { promoteToProduction, getPromotionPreview } from "~/server/services/process/promotion";
 import { compareVersions } from "~/server/services/process/version-diff";
+import { rollbackToVersion } from "~/server/services/process/rollback";
 
 // Initialize AJV for JSON Schema Draft 7 validation
 const ajv = new Ajv({ strict: false });
@@ -1453,6 +1454,331 @@ export const processRouter = createTRPCRouter({
             }
           : null,
         cacheInvalidated: result.cacheInvalidated,
+      };
+    }),
+
+  /**
+   * Get version history for a process.
+   *
+   * Story 5.4 AC: 1, 2, 3 - Returns version history with computed fields.
+   * Ordered by version number descending (newest first).
+   *
+   * @returns Array of VersionHistoryEntry with computed fields (isCurrent, canPromote, canRollback)
+   */
+  getHistory: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Verify process exists and belongs to tenant
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Get all versions for this process, ordered by version number descending
+      const versions = await db.processVersion.findMany({
+        where: { processId: input.processId },
+        orderBy: { createdAt: "desc" },
+        skip: input.offset,
+        take: input.limit,
+      });
+
+      // Find currently active versions for each environment
+      const activeSandbox = versions.find(
+        (v) =>
+          v.environment === "SANDBOX" &&
+          v.status === "ACTIVE" &&
+          v.deprecatedAt === null
+      );
+      const activeProduction = versions.find(
+        (v) =>
+          v.environment === "PRODUCTION" &&
+          v.status === "ACTIVE" &&
+          v.deprecatedAt === null
+      );
+
+      // Get total count for pagination
+      const totalCount = await db.processVersion.count({
+        where: { processId: input.processId },
+      });
+
+      // Map versions with computed fields
+      return {
+        versions: versions.map((v) => {
+          // isCurrent: true if this is the active version for its environment
+          const isCurrent =
+            (v.environment === "SANDBOX" && v.id === activeSandbox?.id) ||
+            (v.environment === "PRODUCTION" && v.id === activeProduction?.id);
+
+          // canPromote: true if SANDBOX, ACTIVE, and not deprecated
+          const canPromote =
+            v.environment === "SANDBOX" &&
+            v.status === "ACTIVE" &&
+            v.deprecatedAt === null;
+
+          // canRollback: true if not the current active sandbox version
+          const canRollback = v.id !== activeSandbox?.id;
+
+          return {
+            id: v.id,
+            version: v.version,
+            environment: v.environment,
+            status: v.status,
+            createdAt: v.createdAt,
+            publishedAt: v.publishedAt,
+            deprecatedAt: v.deprecatedAt,
+            changeNotes: v.changeNotes,
+            promotedBy: v.promotedBy,
+            isCurrent,
+            canPromote,
+            canRollback,
+          };
+        }),
+        totalCount,
+        hasMore: input.offset + versions.length < totalCount,
+      };
+    }),
+
+  /**
+   * Get single version details with full config.
+   *
+   * Story 5.4 AC: 4 - Returns full ProcessVersion with config and schemas.
+   */
+  getVersionDetails: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        versionId: z.string().min(1, "Version ID is required"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Get version with tenant validation via process
+      const version = await db.processVersion.findFirst({
+        where: {
+          id: input.versionId,
+          processId: input.processId,
+          process: { tenantId, deletedAt: null },
+        },
+        include: {
+          process: {
+            select: {
+              id: true,
+              name: true,
+              inputSchema: true,
+              outputSchema: true,
+            },
+          },
+        },
+      });
+
+      if (!version) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Version not found",
+        });
+      }
+
+      return {
+        id: version.id,
+        version: version.version,
+        environment: version.environment,
+        status: version.status,
+        config: version.config,
+        createdAt: version.createdAt,
+        publishedAt: version.publishedAt,
+        deprecatedAt: version.deprecatedAt,
+        changeNotes: version.changeNotes,
+        promotedBy: version.promotedBy,
+        process: {
+          id: version.process.id,
+          name: version.process.name,
+          inputSchema: version.process.inputSchema,
+          outputSchema: version.process.outputSchema,
+        },
+      };
+    }),
+
+  /**
+   * Compare two versions and return diff.
+   *
+   * Story 5.4 AC: 5 - Allows selecting two versions for side-by-side diff.
+   */
+  diff: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        version1Id: z.string().min(1, "Version 1 ID is required"),
+        version2Id: z.string().min(1, "Version 2 ID is required"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Verify process exists and belongs to tenant
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Load both versions
+      const [version1, version2] = await Promise.all([
+        db.processVersion.findFirst({
+          where: {
+            id: input.version1Id,
+            processId: input.processId,
+          },
+        }),
+        db.processVersion.findFirst({
+          where: {
+            id: input.version2Id,
+            processId: input.processId,
+          },
+        }),
+      ]);
+
+      if (!version1) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Version 1 not found",
+        });
+      }
+
+      if (!version2) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Version 2 not found",
+        });
+      }
+
+      // Compare versions using existing diff service
+      const diff = compareVersions(version1, version2);
+
+      return {
+        version1: {
+          id: version1.id,
+          version: version1.version,
+          environment: version1.environment,
+          createdAt: version1.createdAt,
+        },
+        version2: {
+          id: version2.id,
+          version: version2.version,
+          environment: version2.environment,
+          createdAt: version2.createdAt,
+        },
+        ...diff,
+      };
+    }),
+
+  /**
+   * Rollback to a previous version.
+   *
+   * Story 5.4 AC: 7, 8, 9, 10 - Creates new sandbox version from target version.
+   * Version numbers auto-increment and are never reused.
+   */
+  rollback: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        targetVersionId: z.string().min(1, "Target version ID is required"),
+        changeNotes: z.string().max(1000, "Change notes too long").optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Execute rollback via service (handles validation, transaction, audit)
+      const result = await rollbackToVersion(
+        {
+          processId: input.processId,
+          targetVersionId: input.targetVersionId,
+          changeNotes: input.changeNotes,
+        },
+        {
+          tenantId,
+          userId: ctx.session.user.id,
+        }
+      );
+
+      return {
+        newVersion: {
+          id: result.newVersion.id,
+          version: result.newVersion.version,
+          environment: result.newVersion.environment,
+          status: result.newVersion.status,
+          publishedAt: result.newVersion.publishedAt,
+          changeNotes: result.newVersion.changeNotes,
+          createdAt: result.newVersion.createdAt,
+        },
+        sourceVersion: {
+          id: result.sourceVersion.id,
+          version: result.sourceVersion.version,
+        },
+        deprecatedVersion: result.deprecatedVersion
+          ? {
+              id: result.deprecatedVersion.id,
+              version: result.deprecatedVersion.version,
+              status: result.deprecatedVersion.status,
+              deprecatedAt: result.deprecatedVersion.deprecatedAt,
+            }
+          : null,
       };
     }),
 });

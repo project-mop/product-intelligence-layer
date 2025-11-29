@@ -10,7 +10,9 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { CallLogEntry } from "~/server/services/callLog/types";
-import type { JsonValue } from "../../../../../generated/prisma/runtime/library";
+
+// Local type to avoid importing from generated Prisma files (not available in CI pre-build)
+type JsonValue = string | number | boolean | { [key: string]: JsonValue } | JsonValue[] | null;
 
 // Mock the database module
 vi.mock("~/server/db", () => ({

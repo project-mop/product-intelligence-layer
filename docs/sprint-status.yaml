@@ -90,7 +90,7 @@ development_status:
   # Epic 6: Observability & Logging (6 stories - added Story 6.6 from Epic 3)
   epic-6: backlog
   6-1-call-logging-infrastructure: done
-  6-2-call-history-ui: backlog
+  6-2-call-history-ui: ready-for-dev
   6-3-90-day-log-retention: backlog
   6-4-log-export: backlog
   6-5-input-anonymization-toggle: backlog

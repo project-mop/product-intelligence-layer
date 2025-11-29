@@ -519,3 +519,275 @@ describe("Story 6.1: Call Log Router Integration Tests", () => {
     });
   });
 });
+
+/**
+ * Story 6.2: Call History UI Integration Tests
+ *
+ * Additional integration tests supporting the Call History UI feature.
+ * These tests verify API behaviors specifically needed by UI components.
+ *
+ * @see docs/stories/6-2-call-history-ui.md
+ */
+describe("Story 6.2: Call History UI Integration Tests", () => {
+  describe("callLog.list - UI scenarios", () => {
+    it("AC 1: should return logs with all fields needed for table display", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 200,
+        latencyMs: 245,
+        cached: true,
+        modelUsed: "claude-3-haiku-20240307",
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.callLog.list({ processId: process.id });
+
+      expect(result.logs).toHaveLength(1);
+      const log = result.logs[0]!;
+
+      // Verify all fields needed for UI table
+      expect(log.id).toBeDefined();
+      expect(log.statusCode).toBe(200);
+      expect(log.latencyMs).toBe(245);
+      expect(log.cached).toBe(true);
+      expect(log.modelUsed).toBe("claude-3-haiku-20240307");
+      expect(log.createdAt).toBeDefined();
+      expect(log.processId).toBe(process.id);
+    });
+
+    it("AC 3: should filter by date range for date picker", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      const today = new Date();
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      const threeDaysAgo = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        createdAt: threeDaysAgo,
+        statusCode: 200,
+      });
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        createdAt: today,
+        statusCode: 201,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      // Filter for last 2 days only
+      const result = await caller.callLog.list({
+        processId: process.id,
+        startDate: yesterday,
+      });
+
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0]?.statusCode).toBe(201);
+    });
+
+    it("AC 4: should support cursor pagination for Load More pattern", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      // Create 10 logs
+      await callLogFactory.createMany(
+        {
+          tenantId: tenant.id,
+          processId: process.id,
+          processVersionId: version.id,
+        },
+        10
+      );
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      // First page
+      const page1 = await caller.callLog.list({ processId: process.id, limit: 5 });
+      expect(page1.logs).toHaveLength(5);
+      expect(page1.nextCursor).toBeDefined();
+
+      // Second page using cursor
+      const page2 = await caller.callLog.list({
+        processId: process.id,
+        limit: 5,
+        cursor: page1.nextCursor,
+      });
+      expect(page2.logs).toHaveLength(5);
+      expect(page2.nextCursor).toBeUndefined();
+
+      // Verify no duplicates between pages
+      const page1Ids = new Set(page1.logs.map((l) => l.id));
+      const page2Ids = page2.logs.map((l) => l.id);
+      for (const id of page2Ids) {
+        expect(page1Ids.has(id)).toBe(false);
+      }
+    });
+  });
+
+  describe("callLog.get - UI scenarios", () => {
+    it("AC 2: should return full input/output for detail view", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      const complexInput = {
+        query: "test query",
+        options: { limit: 10, nested: { deep: true } },
+      };
+      const complexOutput = {
+        result: "success",
+        data: [{ id: 1, name: "Item 1" }, { id: 2, name: "Item 2" }],
+      };
+
+      const log = await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        input: complexInput,
+        output: complexOutput,
+        statusCode: 200,
+        latencyMs: 500,
+        modelUsed: "claude-3-sonnet-20240229",
+        cached: false,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.callLog.get({ id: log.id });
+
+      // Verify full detail data
+      expect(result.input).toEqual(complexInput);
+      expect(result.output).toEqual(complexOutput);
+      expect(result.statusCode).toBe(200);
+      expect(result.latencyMs).toBe(500);
+      expect(result.modelUsed).toBe("claude-3-sonnet-20240229");
+      expect(result.cached).toBe(false);
+      expect(result.processVersionId).toBe(version.id);
+    });
+
+    it("AC 2: should return error details for failed calls", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      const log = await callLogFactory.createError({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 500,
+        errorCode: "INTERNAL_ERROR",
+        input: { query: "test" },
+        output: { error: "Something went wrong" },
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.callLog.get({ id: log.id });
+
+      expect(result.statusCode).toBe(500);
+      expect(result.errorCode).toBe("INTERNAL_ERROR");
+      expect(result.output).toEqual({ error: "Something went wrong" });
+    });
+  });
+
+  describe("callLog.stats - UI scenarios", () => {
+    it("AC 1: should return stats for stats header display", async () => {
+      const { user, tenant } = await userFactory.createWithTenant();
+      const process = await processFactory.create({ tenantId: tenant.id });
+      const version = await processVersionFactory.create({
+        processId: process.id,
+      });
+
+      // Create mixed success/error logs
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 200,
+        latencyMs: 100,
+      });
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 200,
+        latencyMs: 200,
+      });
+      await callLogFactory.create({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 200,
+        latencyMs: 300,
+      });
+      await callLogFactory.createError({
+        tenantId: tenant.id,
+        processId: process.id,
+        processVersionId: version.id,
+        statusCode: 500,
+        errorCode: "ERROR",
+        latencyMs: 50,
+      });
+
+      const caller = createAuthenticatedCaller({
+        userId: user.id,
+        tenantId: tenant.id,
+      });
+
+      const result = await caller.callLog.stats({
+        processId: process.id,
+        days: 7,
+      });
+
+      // Verify totals for UI display
+      expect(result.totals.total).toBe(4);
+      expect(result.totals.success).toBe(3);
+      expect(result.totals.error).toBe(1);
+      expect(result.totals.successRate).toBe(75);
+
+      // Verify status breakdown
+      const status200 = result.byStatusCode.find((s) => s.statusCode === 200);
+      expect(status200?.count).toBe(3);
+      expect(status200?.avgLatencyMs).toBe(200); // (100+200+300)/3 = 200
+    });
+  });
+});

@@ -1,0 +1,263 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>2</storyId>
+    <title>Call History UI</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-2-call-history-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to view call history for my intelligences in the dashboard</iWant>
+    <soThat>I can monitor usage and debug issues</soThat>
+    <tasks>
+      <task id="1" ac="1,8">Create call history page route at /dashboard/processes/[id]/logs with breadcrumb navigation and process not found handling</task>
+      <task id="2" ac="1,4,6">Create CallHistoryTable component with sortable columns (Timestamp, Status, Latency, Model, Cached, Actions), status color-coded badges, latency color coding, cached indicator, and truncated input/output on hover</task>
+      <task id="3" ac="4">Implement cursor-based pagination with CallLogPagination component using Load More pattern</task>
+      <task id="4" ac="3">Create CallLogFilters component with date range picker, status filter dropdown, and latency threshold input with URL query param sync</task>
+      <task id="5" ac="2,7">Create CallLogDetail sheet with full request/response JSON, syntax highlighting, copy buttons, and all metadata fields</task>
+      <task id="6" ac="5">Add Refresh button with last refreshed timestamp and tRPC query invalidation</task>
+      <task id="7" ac="8,9,10">Create empty state, error state with retry, and loading skeleton components</task>
+      <task id="8" ac="1">Create CallLogStats component showing total calls, success rate, avg latency for last 7 days</task>
+      <task id="9" ac="all">Write unit tests for CallHistoryTable, CallLogFilters, and CallLogDetail components</task>
+      <task id="10" ac="1-4">Write integration tests for Story 6.2 in call-log-router.test.ts</task>
+      <task id="11" ac="1">Add Call History tab/link to process detail page</task>
+      <task id="12" ac="1-10">Verification: typecheck, lint, unit tests, integration tests, build, manual testing</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Given I select an intelligence, when I click "Call History" or navigate to the logs tab, then I see a table of recent calls with: timestamp, status, latency, truncated input/output (FR-408)</criterion>
+    <criterion id="2">Given I click on a specific call, when the detail view opens, then I see full input, full output, all metadata</criterion>
+    <criterion id="3">I can filter by: date range, status (success/error), latency threshold</criterion>
+    <criterion id="4">Pagination handles large result sets efficiently using cursor-based pagination</criterion>
+    <criterion id="5">Real-time updates for new calls via optional manual refresh button</criterion>
+    <criterion id="6">Call history table shows: timestamp, status code indicator (color-coded), latency, model used, cached indicator</criterion>
+    <criterion id="7">Detail view shows: full request/response JSON with syntax highlighting, copy buttons for input/output</criterion>
+    <criterion id="8">Empty state shows helpful message when no calls exist for a process</criterion>
+    <criterion id="9">Error state shows clear message when data fails to load with retry option</criterion>
+    <criterion id="10">Loading states show skeleton UI while data is being fetched</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 6: Observability and Logging - Story 6.2</section>
+        <snippet>Story 6.2 enables users to view call history for intelligences in the dashboard with table of recent calls, filtering, pagination, and detail view.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Data Architecture - call_logs</section>
+        <snippet>call_logs table includes: id, tenant_id, process_id, process_version_id, input_hash, input, output, latency_ms, cached, error_code, status_code, model_used, created_at with tenant isolation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>tRPC Patterns</section>
+        <snippet>Use protectedProcedure for authenticated routes, Zod for input validation, TRPCError with appropriate codes, and resource-based router naming.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy</title>
+        <section>Test Types Overview</section>
+        <snippet>Unit tests with Vitest in tests/unit/, integration tests in tests/integration/, component tests with RTL. Coverage threshold: 90% lines.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/6-1-call-logging-infrastructure.md</path>
+        <title>Story 6.1: Call Logging Infrastructure</title>
+        <section>Dev Notes - Learnings</section>
+        <snippet>CallLog model exists in Prisma, callLog service provides logCallAsync/logCallSync, callLog tRPC router provides list/get/stats procedures with cursor pagination.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>src/server/api/routers/callLog.ts</path>
+        <kind>tRPC router</kind>
+        <symbol>callLogRouter</symbol>
+        <lines>1-179</lines>
+        <reason>Existing tRPC router with list (cursor pagination, filtering), get (full details), and stats (aggregated metrics) procedures. UI components will use these.</reason>
+      </item>
+      <item>
+        <path>src/server/services/callLog/call-log-service.ts</path>
+        <kind>service</kind>
+        <symbol>logCallAsync, logCallSync</symbol>
+        <reason>Call log service for writing logs. UI is read-only but understanding data shape is important.</reason>
+      </item>
+      <item>
+        <path>src/server/services/callLog/types.ts</path>
+        <kind>types</kind>
+        <symbol>CallLogEntry, CallLogResult</symbol>
+        <reason>Type definitions for call log entries - matches what tRPC router returns.</reason>
+      </item>
+      <item>
+        <path>src/app/dashboard/processes/[id]/page.tsx</path>
+        <kind>page</kind>
+        <symbol>ProcessDetailPage</symbol>
+        <lines>1-406</lines>
+        <reason>Process detail page where Call History link/tab will be added. Contains existing action buttons pattern.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/table.tsx</path>
+        <kind>component</kind>
+        <symbol>Table, TableHeader, TableBody, TableRow, TableCell</symbol>
+        <reason>shadcn Table component to use for CallHistoryTable.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/sheet.tsx</path>
+        <kind>component</kind>
+        <symbol>Sheet, SheetContent, SheetHeader, SheetTitle</symbol>
+        <reason>shadcn Sheet component for slide-in detail panel (CallLogDetail).</reason>
+      </item>
+      <item>
+        <path>src/components/ui/badge.tsx</path>
+        <kind>component</kind>
+        <symbol>Badge</symbol>
+        <reason>Badge component for status indicators (success/error color coding).</reason>
+      </item>
+      <item>
+        <path>src/components/ui/skeleton.tsx</path>
+        <kind>component</kind>
+        <symbol>Skeleton</symbol>
+        <reason>Skeleton component for loading states.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/tooltip.tsx</path>
+        <kind>component</kind>
+        <symbol>Tooltip, TooltipContent, TooltipTrigger</symbol>
+        <reason>Tooltip component for truncated input/output preview on hover.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/select.tsx</path>
+        <kind>component</kind>
+        <symbol>Select, SelectContent, SelectItem, SelectTrigger, SelectValue</symbol>
+        <reason>Select component for status filter dropdown.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/input.tsx</path>
+        <kind>component</kind>
+        <symbol>Input</symbol>
+        <reason>Input component for latency threshold filter.</reason>
+      </item>
+      <item>
+        <path>src/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <reason>Button component for actions, refresh, pagination.</reason>
+      </item>
+      <item>
+        <path>src/components/dashboard/ProcessEmptyState.tsx</path>
+        <kind>component</kind>
+        <symbol>ProcessEmptyState</symbol>
+        <reason>Reference pattern for empty state component design.</reason>
+      </item>
+      <item>
+        <path>tests/support/factories/call-log.factory.ts</path>
+        <kind>test factory</kind>
+        <symbol>callLogFactory</symbol>
+        <reason>Test factory for creating call log entries in integration tests.</reason>
+      </item>
+      <item>
+        <path>tests/integration/call-log-router.test.ts</path>
+        <kind>test</kind>
+        <symbol>describe blocks for Story 6.1</symbol>
+        <reason>Existing integration tests for callLog router. Story 6.2 tests will be added here.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <node>
+        <package>react-syntax-highlighter</package>
+        <version>^16.1.0</version>
+        <purpose>JSON syntax highlighting in detail view (already installed per package.json)</purpose>
+      </node>
+      <node>
+        <package>date-fns</package>
+        <note>Not installed - may need to add for date formatting/relative time, or use native Date APIs</note>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.555.0</version>
+        <purpose>Icons for UI (RefreshCw, History, Check, X, Clock, etc.)</purpose>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">All queries must include tenantId filter for multi-tenant isolation</constraint>
+    <constraint type="architecture">Use tRPC protectedProcedure for all authenticated routes</constraint>
+    <constraint type="pattern">Follow existing component patterns in src/components/ with kebab-case files</constraint>
+    <constraint type="pattern">Use shadcn/ui components from src/components/ui/</constraint>
+    <constraint type="testing">Unit tests for React components with RTL in tests/unit/components/</constraint>
+    <constraint type="testing">Integration tests in tests/integration/ with real database</constraint>
+    <constraint type="testing">50% coverage minimum for MVP</constraint>
+    <constraint type="security">Input/output data may contain sensitive customer information - no data export in this story</constraint>
+    <constraint type="performance">Use cursor-based pagination for efficient large dataset handling</constraint>
+    <constraint type="ui">Status color coding: green=2xx, yellow=4xx, red=5xx</constraint>
+    <constraint type="ui">Latency color thresholds: green less than 500ms, yellow 500-2000ms, red greater than or equal to 2000ms</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>callLog.list</name>
+      <kind>tRPC procedure</kind>
+      <signature>input: { processId?: string, limit?: number (1-100, default 50), cursor?: string, startDate?: Date, endDate?: Date, statusCode?: number } returns { logs: CallLogListItem[], nextCursor?: string }</signature>
+      <path>src/server/api/routers/callLog.ts:26-80</path>
+    </interface>
+    <interface>
+      <name>callLog.get</name>
+      <kind>tRPC procedure</kind>
+      <signature>input: { id: string } returns CallLog (full details including input/output JSON)</signature>
+      <path>src/server/api/routers/callLog.ts:88-115</path>
+    </interface>
+    <interface>
+      <name>callLog.stats</name>
+      <kind>tRPC procedure</kind>
+      <signature>input: { processId: string, days?: number (1-90, default 7) } returns { byStatusCode: Array, totals: { total, success, error, successRate } }</signature>
+      <path>src/server/api/routers/callLog.ts:124-177</path>
+    </interface>
+    <interface>
+      <name>CallLogFilters</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ startDate?: Date; endDate?: Date; statusCode?: number; minLatencyMs?: number }</signature>
+      <path>To be created in src/components/callLog/CallLogFilters.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with React Testing Library for components. Integration tests use Vitest with real PostgreSQL database via testDb utilities. Component tests should mock tRPC queries. Use screen.getByRole/getByText for accessible queries. Follow Arrange-Act-Assert pattern.
+    </standards>
+    <locations>
+      <location>tests/unit/components/callLog/*.test.tsx</location>
+      <location>tests/integration/call-log-router.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test CallHistoryTable renders with mock data showing all columns</idea>
+      <idea ac="1">Test CallHistoryTable displays timestamps in relative format</idea>
+      <idea ac="2">Test CallLogDetail sheet opens when clicking View button</idea>
+      <idea ac="2">Test CallLogDetail displays full JSON with syntax highlighting</idea>
+      <idea ac="3">Test CallLogFilters date range picker updates query params</idea>
+      <idea ac="3">Test CallLogFilters status dropdown filters table data</idea>
+      <idea ac="4">Test pagination Load More button fetches next page</idea>
+      <idea ac="4">Test pagination hides Load More when no more data</idea>
+      <idea ac="5">Test Refresh button invalidates query and refetches</idea>
+      <idea ac="6">Test status badges render correct colors (green/yellow/red)</idea>
+      <idea ac="6">Test latency displays with correct color coding</idea>
+      <idea ac="6">Test cached indicator shows for cached responses</idea>
+      <idea ac="7">Test copy buttons copy JSON to clipboard</idea>
+      <idea ac="8">Test empty state renders when no logs exist</idea>
+      <idea ac="9">Test error state renders with retry button on fetch failure</idea>
+      <idea ac="10">Test skeleton loading state renders during data fetch</idea>
+      <idea ac="integration">Test list returns logs for authenticated user only</idea>
+      <idea ac="integration">Test list respects date range filters</idea>
+      <idea ac="integration">Test list respects status code filter</idea>
+      <idea ac="integration">Test cursor pagination works correctly</idea>
+      <idea ac="integration">Test tenant isolation - cannot see other tenant logs</idea>
+    </ideas>
+  </tests>
+</story-context>

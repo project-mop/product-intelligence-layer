@@ -38,6 +38,7 @@ export {
 } from "./api-key.factory";
 export { processFactory } from "./process.factory";
 export { processVersionFactory } from "./process-version.factory";
+export { callLogFactory } from "./call-log.factory";
 
 /**
  * Resets all factory counters.

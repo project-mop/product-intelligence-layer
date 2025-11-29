@@ -1,0 +1,295 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>1</storyId>
+    <title>Call Logging Infrastructure</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-29</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/6-1-call-logging-infrastructure.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system</asA>
+    <iWant>to log every API call with comprehensive metadata</iWant>
+    <soThat>users can review their usage and debug issues</soThat>
+    <tasks>
+      <task id="1" title="Create call_logs database schema">
+        <ac>1-11, 13, 14</ac>
+        <subtasks>
+          <subtask>Add CallLog model to prisma/schema.prisma (NOTE: Model already exists - verify fields match story requirements)</subtask>
+          <subtask>Add statusCode and modelUsed fields if missing</subtask>
+          <subtask>Run pnpm prisma db push to apply schema changes</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Create call log service">
+        <ac>1-12</ac>
+        <subtasks>
+          <subtask>Create src/server/services/callLog/index.ts</subtask>
+          <subtask>Create src/server/services/callLog/types.ts</subtask>
+          <subtask>Create src/server/services/callLog/call-log-service.ts with logCallAsync and logCallSync</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Integrate call logging into intelligence API route">
+        <ac>1-12</ac>
+        <subtasks>
+          <subtask>Modify src/app/api/v1/intelligence/[processId]/generate/route.ts - add timing capture and logging</subtask>
+          <subtask>Modify src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts - same integration</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Log error cases">
+        <ac>5, 8, 9</ac>
+        <subtasks>
+          <subtask>Add call logging to error handlers in API routes</subtask>
+          <subtask>Log 400, 401/403, 429, 500/503 errors with appropriate error codes</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Add model_used tracking to LLM gateway">
+        <ac>10</ac>
+        <subtasks>
+          <subtask>Verify GenerateResult includes model field (already present in types.ts)</subtask>
+          <subtask>Ensure model name flows through to call log</subtask>
+        </subtasks>
+      </task>
+      <task id="6" title="Create callLog tRPC router">
+        <ac>13, 14</ac>
+        <subtasks>
+          <subtask>Create src/server/api/routers/callLog.ts with list, get, stats procedures</subtask>
+          <subtask>Add router to src/server/api/root.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="7" title="Add factory for call logs">
+        <ac>1-11</ac>
+        <subtasks>
+          <subtask>Create tests/support/factories/call-log.factory.ts</subtask>
+          <subtask>Export from tests/support/factories/index.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="8" title="Write unit tests for call log service">
+        <ac>1, 12</ac>
+        <subtasks>
+          <subtask>Create tests/unit/server/services/call-log-service.test.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="9" title="Write integration tests for call logging">
+        <ac>1-14</ac>
+        <subtasks>
+          <subtask>Create tests/integration/call-log-router.test.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="10" title="Write integration tests for API route logging">
+        <ac>1-12</ac>
+        <subtasks>
+          <subtask>Add Story 6.1 tests to tests/integration/intelligence-api.test.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="11" title="Verification">
+        <ac>1-14</ac>
+        <subtasks>
+          <subtask>Run pnpm typecheck - zero errors</subtask>
+          <subtask>Run pnpm lint - zero new errors</subtask>
+          <subtask>Run pnpm test:unit - all tests pass</subtask>
+          <subtask>Run pnpm test:integration - Story 6.1 tests pass</subtask>
+          <subtask>Run pnpm build - production build succeeds</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Every API call (success or failure) creates a log entry in the call_logs table (FR-401)</criterion>
+    <criterion id="2">Log entry contains timestamp with timezone for when call was made (FR-401)</criterion>
+    <criterion id="3">Log entry contains tenant_id for multi-tenant isolation (FR-401)</criterion>
+    <criterion id="4">Log entry contains process_id referencing the intelligence definition (FR-401)</criterion>
+    <criterion id="5">Log entry contains input snapshot - the actual request payload sent (FR-402)</criterion>
+    <criterion id="6">Log entry contains output - the response returned to the client (FR-403)</criterion>
+    <criterion id="7">Log entry contains latency_ms - time from request to response in milliseconds (FR-404)</criterion>
+    <criterion id="8">Log entry contains status_code - HTTP status returned (FR-405)</criterion>
+    <criterion id="9">Log entry contains error_code if request failed (FR-405)</criterion>
+    <criterion id="10">Log entry contains model_used - which LLM model processed the request (FR-406)</criterion>
+    <criterion id="11">Log entry contains endpoint_version - which process version was used (FR-407)</criterion>
+    <criterion id="12">Logs are written asynchronously (non-blocking to response)</criterion>
+    <criterion id="13">Log storage is indexed for efficient querying by tenant_id, process_id, timestamp</criterion>
+    <criterion id="14">All call log fields are queryable for later UI/export features</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Data Architecture - call_logs</section>
+        <snippet>call_logs entity defined with id (req_*), tenant_id, process_id, process_version_id, input_hash, output (JSON), latency_ms, cached, error_code, created_at. See Implementation Checklist: call_logs entry is created for ALL requests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Intelligence Generation Flow</section>
+        <snippet>Flow: Customer Request → Auth → Rate Limit → Input Validation → Cache Lookup → Prompt Assembly → LLM Gateway → Output Validation → Cache Store → Log Entry → Response. All responses must include meta.cached, meta.latency_ms, meta.request_id.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 6: Observability &amp; Logging - Story 6.1</section>
+        <snippet>Story 6.1 establishes call logging infrastructure. Log entry includes: timestamp, tenant_id, intelligence_id, input (optionally anonymized), output, latency_ms, status_code, error_code, model_used, endpoint_version. Covers FR-401 through FR-407.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Patterns</section>
+        <snippet>Unit tests mock external dependencies. Integration tests use real database with automatic cleanup. Use testDb from tests/support/db.ts. Factory pattern: build() for memory, create() for database persistence.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>CallLog</symbol>
+        <lines>208-232</lines>
+        <reason>CallLog model already exists with most required fields. Verify statusCode and modelUsed fields exist. Has indexes on tenantId, processId, createdAt, and compound indexes.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <lines>163-431</lines>
+        <reason>Production endpoint to modify - add call logging at request start (timing), after response preparation, and in error handlers.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <reason>Sandbox endpoint - same logging integration required.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/llm/types.ts</path>
+        <kind>types</kind>
+        <symbol>GenerateResult</symbol>
+        <lines>34-51</lines>
+        <reason>GenerateResult already includes model field - use this for model_used logging.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/services/cache/hash.ts</path>
+        <kind>service</kind>
+        <symbol>computeInputHash</symbol>
+        <lines>61-71</lines>
+        <reason>Use this function for inputHash field in call logs - already available.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/id.ts</path>
+        <kind>utility</kind>
+        <symbol>generateRequestId</symbol>
+        <lines>86-89</lines>
+        <reason>Use generateRequestId() or generateId("req") for call log IDs with req_* prefix.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/errors.ts</path>
+        <kind>types</kind>
+        <symbol>ErrorCode</symbol>
+        <lines>15-53</lines>
+        <reason>Error codes to use for errorCode field: VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, LLM_TIMEOUT, LLM_ERROR, RATE_LIMITED, etc.</reason>
+      </artifact>
+      <artifact>
+        <path>src/server/api/root.ts</path>
+        <kind>router</kind>
+        <symbol>appRouter</symbol>
+        <lines>13-19</lines>
+        <reason>Add callLogRouter to appRouter. Follow existing pattern: import then add to createTRPCRouter object.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/factories/index.ts</path>
+        <kind>test-support</kind>
+        <symbol>factories</symbol>
+        <lines>27-49</lines>
+        <reason>Add callLogFactory export. Follow existing pattern: export from ./call-log.factory.ts</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/intelligence-api.test.ts</path>
+        <kind>test</kind>
+        <symbol>Intelligence API tests</symbol>
+        <reason>Add Story 6.1 describe block for call logging tests. Verify log entries are created for success/failure cases.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@prisma/client" version="^7.0.1">ORM for database operations</package>
+        <package name="zod" version="^3.24.2">Schema validation for tRPC router inputs</package>
+        <package name="vitest" version="^4.0.14">Test framework</package>
+        <package name="@trpc/server" version="^11.0.0">tRPC for callLog router</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture">All database queries filtered by tenant_id - mandatory tenant isolation</constraint>
+    <constraint source="architecture">API keys stored as hashes, logs do not contain actual API keys</constraint>
+    <constraint source="dev-notes">Logs written asynchronously (fire-and-forget) to avoid blocking API responses</constraint>
+    <constraint source="dev-notes">Error logs do not leak stack traces or internal details to stored output</constraint>
+    <constraint source="architecture">Input data may contain sensitive customer information - will support anonymization in Story 6.5</constraint>
+    <constraint source="testing-strategy">Integration tests use real PostgreSQL database - use TEST_DATABASE_URL</constraint>
+    <constraint source="testing-strategy">Coverage thresholds: 90% lines, 70% functions, 90% branches, 90% statements</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CallLogEntry</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface CallLogEntry { tenantId: string; processId: string; processVersionId: string; inputHash: string; input?: Record&lt;string, unknown&gt;; output?: Record&lt;string, unknown&gt;; statusCode: number; errorCode?: string; latencyMs: number; modelUsed?: string; cached: boolean; }</signature>
+      <path>src/server/services/callLog/types.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>logCallAsync</name>
+      <kind>function</kind>
+      <signature>function logCallAsync(entry: CallLogEntry): Promise&lt;void&gt;</signature>
+      <path>src/server/services/callLog/call-log-service.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>logCallSync</name>
+      <kind>function</kind>
+      <signature>function logCallSync(entry: CallLogEntry): Promise&lt;CallLogResult&gt;</signature>
+      <path>src/server/services/callLog/call-log-service.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>callLogRouter.list</name>
+      <kind>tRPC procedure</kind>
+      <signature>protectedProcedure.input(z.object({ processId: z.string().optional(), limit: z.number(), cursor: z.string().optional(), startDate: z.date().optional(), endDate: z.date().optional(), statusCode: z.number().optional() })).query()</signature>
+      <path>src/server/api/routers/callLog.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>callLogRouter.get</name>
+      <kind>tRPC procedure</kind>
+      <signature>protectedProcedure.input(z.object({ id: z.string() })).query()</signature>
+      <path>src/server/api/routers/callLog.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>callLogRouter.stats</name>
+      <kind>tRPC procedure</kind>
+      <signature>protectedProcedure.input(z.object({ processId: z.string(), days: z.number() })).query()</signature>
+      <path>src/server/api/routers/callLog.ts (to create)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests for call log service use Vitest with mocked database. Integration tests for tRPC router and API route logging use real PostgreSQL database (TEST_DATABASE_URL). Follow Arrange-Act-Assert pattern. Test behavior not implementation. 50% coverage minimum for MVP per Dev Notes.</standards>
+    <locations>
+      <location>tests/unit/server/services/</location>
+      <location>tests/integration/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test: Successful API call creates log entry with all required fields</idea>
+      <idea ac="1">Test: Failed API call (validation error) creates log entry</idea>
+      <idea ac="2,3,4">Test: Log entry contains correct tenant_id, process_id, timestamp</idea>
+      <idea ac="5,6">Test: Log entry contains input and output snapshots</idea>
+      <idea ac="7">Test: Log entry contains latency_ms > 0</idea>
+      <idea ac="8,9">Test: Error responses create logs with correct statusCode and errorCode</idea>
+      <idea ac="10">Test: Log entry contains modelUsed from LLM response</idea>
+      <idea ac="11">Test: Log entry contains processVersionId matching active version</idea>
+      <idea ac="12">Test: logCallAsync does not block - catches and logs errors silently</idea>
+      <idea ac="13,14">Test: callLogRouter.list filters by tenant, process, date range, status</idea>
+      <idea ac="13,14">Test: callLogRouter.list supports cursor-based pagination</idea>
+      <idea ac="13,14">Test: callLogRouter.get returns single log with all fields</idea>
+      <idea ac="13,14">Test: callLogRouter.get rejects access to other tenant's logs</idea>
+      <idea ac="13,14">Test: callLogRouter.stats returns aggregated data by statusCode</idea>
+    </ideas>
+  </tests>
+</story-context>

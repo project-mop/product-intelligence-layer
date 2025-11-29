@@ -47,6 +47,7 @@ import { buildVersionHeaders, applyVersionHeaders } from "~/server/services/proc
 import { getGatewayOverride } from "./testing";
 import { computeInputHash, getCacheService } from "~/server/services/cache";
 import { ApiError } from "~/lib/errors";
+import { logCallAsync } from "~/server/services/callLog";
 
 interface RouteParams {
   params: Promise<{
@@ -352,6 +353,21 @@ export async function POST(
     );
 
     if (cachedEntry) {
+      const latencyMs = Date.now() - startTime;
+
+      // Log cache hit (Story 6.1)
+      logCallAsync({
+        tenantId: apiKeyContext.tenantId,
+        processId,
+        processVersionId: activeVersion.id,
+        inputHash,
+        input: validatedInput,
+        output: cachedEntry.data,
+        statusCode: 200,
+        latencyMs,
+        cached: true,
+      });
+
       return createSandboxSuccessResponse(
         cachedEntry.data,
         requestId,
@@ -405,6 +421,27 @@ export async function POST(
       );
     }
 
+    const latencyMs = Date.now() - startTime;
+    const logInputHash = inputHash ?? computeInputHash(
+      apiKeyContext.tenantId,
+      processId,
+      validatedInput
+    );
+
+    // Log successful call (Story 6.1)
+    logCallAsync({
+      tenantId: apiKeyContext.tenantId,
+      processId,
+      processVersionId: activeVersion.id,
+      inputHash: logInputHash,
+      input: validatedInput,
+      output: result.data,
+      statusCode: 200,
+      latencyMs,
+      modelUsed: result.meta.model,
+      cached: false,
+    });
+
     // Step 14: Return success response with version headers
     return createSandboxSuccessResponse(
       result.data,
@@ -415,6 +452,29 @@ export async function POST(
       versionHeaders
     );
   } catch (error) {
+    const latencyMs = Date.now() - startTime;
+    const logInputHash = inputHash ?? (validatedInput
+      ? computeInputHash(apiKeyContext.tenantId, processId, validatedInput)
+      : "unknown");
+
+    // Log error case (Story 6.1)
+    // Extract error details for logging
+    const errorCode = error instanceof ApiError ? error.code : "INTERNAL_ERROR";
+    const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+    logCallAsync({
+      tenantId: apiKeyContext.tenantId,
+      processId,
+      processVersionId: activeVersion.id,
+      inputHash: logInputHash,
+      input: validatedInput,
+      output: { error: { code: errorCode } },
+      statusCode,
+      errorCode,
+      latencyMs,
+      cached: false,
+    });
+
     const response = handleApiError(error, requestId);
     response.headers.set("X-Environment", "sandbox");
     return response;

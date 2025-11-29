@@ -213,8 +213,10 @@ model CallLog {
     inputHash        String // SHA-256 hash of normalized input
     input            Json? // Optional: actual input (can be anonymized)
     output           Json? // Response data
+    statusCode       Int // HTTP status code (200, 400, 401, 429, 500, 503)
     latencyMs        Int // Request duration in milliseconds
     cached           Boolean  @default(false)
+    modelUsed        String? // LLM model name (e.g., claude-3-5-haiku-20241022)
     errorCode        String? // Error code if request failed
     errorMessage     String? // Human-readable error message
     createdAt        DateTime @default(now())
@@ -229,6 +231,8 @@ model CallLog {
     @@index([tenantId, processId])
     @@index([createdAt])
     @@index([tenantId, createdAt])
+    @@index([tenantId, processId, createdAt])
+    @@index([inputHash])
 }
 
 // =============================================================================

@@ -1,6 +1,7 @@
 import { apiKeyRouter } from "~/server/api/routers/apiKey";
 import { auditLogRouter } from "~/server/api/routers/auditLog";
 import { authRouter } from "~/server/api/routers/auth";
+import { callLogRouter } from "~/server/api/routers/callLog";
 import { postRouter } from "~/server/api/routers/post";
 import { processRouter } from "~/server/api/routers/process";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   apiKey: apiKeyRouter,
   auditLog: auditLogRouter,
   auth: authRouter,
+  callLog: callLogRouter,
   post: postRouter,
   process: processRouter,
 });

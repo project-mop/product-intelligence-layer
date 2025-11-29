@@ -1,18 +1,14 @@
 /**
- * Production Intelligence Generation API Endpoint
+ * Sandbox Intelligence Generation API Endpoint
  *
- * POST /api/v1/intelligence/:processId/generate
+ * POST /api/v1/sandbox/intelligence/:processId/generate
  *
- * Production endpoint for generating intelligence output from a process.
+ * Sandbox endpoint for generating intelligence output from a process.
  * Requires Bearer token authentication via API key.
- * Only serves PRODUCTION environment versions.
- * Returns 404 if no production version exists (must promote from sandbox first).
+ * Returns X-Environment: sandbox header.
  *
  * @see docs/stories/5-1-sandbox-and-production-modes.md
- * @see docs/tech-spec-epic-3.md#Story-3.2-LLM-Gateway-Integration
- * @see docs/architecture.md#Public-API-Patterns
- * @see docs/stories/4-3-error-response-contract.md
- * @see docs/stories/4-5-response-caching.md
+ * @see docs/tech-spec-epic-5.md#Story-5.1-Sandbox-and-Production-Modes
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -65,9 +61,9 @@ function getGateway(): AnthropicGateway {
 }
 
 /**
- * Create success response with production environment header
+ * Create success response with environment header
  */
-function createProductionSuccessResponse(
+function createSandboxSuccessResponse(
   data: Record<string, unknown>,
   requestId: string,
   startTime: number,
@@ -80,7 +76,7 @@ function createProductionSuccessResponse(
     "X-Request-Id": requestId,
     "X-Response-Time": `${latencyMs}ms`,
     "X-Cache": cached ? "HIT" : "MISS",
-    "X-Environment": "production",
+    "X-Environment": "sandbox",
   };
 
   if (versionNumber) {
@@ -102,10 +98,9 @@ function createProductionSuccessResponse(
 }
 
 /**
- * POST /api/v1/intelligence/:processId/generate
+ * POST /api/v1/sandbox/intelligence/:processId/generate
  *
- * Generate intelligence output from a PRODUCTION process version.
- * Returns 404 if no production version exists (must promote from sandbox first).
+ * Generate intelligence output from a sandbox process version.
  *
  * Request:
  * - Headers: Authorization: Bearer pil_live_... or pil_test_...
@@ -116,7 +111,7 @@ function createProductionSuccessResponse(
  * - 400: Invalid/missing input
  * - 401: Invalid/missing API key
  * - 403: API key lacks process access
- * - 404: Process not found or no production version
+ * - 404: Process not found or no sandbox version
  * - 500: Output parse failed after retry
  * - 503: LLM timeout or error
  */
@@ -136,7 +131,7 @@ export async function POST(
 
   if (!authResult.valid) {
     const response = unauthorized(authResult.error.message, requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
@@ -150,24 +145,20 @@ export async function POST(
       `API key does not have access to process ${processId}`,
       requestId
     );
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
-  // Step 3: Resolve PRODUCTION version using version resolver
-  // Story 5.1: Production endpoint only serves PRODUCTION versions
+  // Step 3: Resolve SANDBOX version using version resolver
   const resolvedVersion = await resolveVersion({
     processId,
     tenantId: apiKeyContext.tenantId,
-    environment: "PRODUCTION",
+    environment: "SANDBOX",
   });
 
   if (!resolvedVersion) {
-    const response = notFound(
-      "No production version. Promote a sandbox version first.",
-      requestId
-    );
-    response.headers.set("X-Environment", "production");
+    const response = notFound("No sandbox version found", requestId);
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
@@ -184,7 +175,7 @@ export async function POST(
 
   if (!process) {
     const response = notFound("Process not found", requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
@@ -194,13 +185,13 @@ export async function POST(
     body = await request.json();
   } catch {
     const response = badRequest("Invalid JSON in request body", requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
   if (!body || typeof body !== "object") {
     const response = badRequest("Request body must be an object", requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
@@ -208,13 +199,13 @@ export async function POST(
 
   if (input === undefined) {
     const response = badRequest("Missing required field: input", requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
   if (typeof input !== "object" || input === null) {
     const response = badRequest("Field 'input' must be an object", requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 
@@ -228,11 +219,11 @@ export async function POST(
 
     if (!validationResult.success) {
       console.warn(
-        `[Production Generate API] Validation failed for process ${processId}, request ${requestId}:`,
+        `[Sandbox Generate API] Validation failed for process ${processId}, request ${requestId}:`,
         validationResult.errors
       );
       const response = validationError(validationResult.errors, requestId);
-      response.headers.set("X-Environment", "production");
+      response.headers.set("X-Environment", "sandbox");
       return response;
     }
 
@@ -267,7 +258,7 @@ export async function POST(
     );
 
     if (cachedEntry) {
-      return createProductionSuccessResponse(
+      return createSandboxSuccessResponse(
         cachedEntry.data,
         requestId,
         startTime,
@@ -319,8 +310,8 @@ export async function POST(
       );
     }
 
-    // Step 12: Return success response with X-Environment: production
-    return createProductionSuccessResponse(
+    // Step 12: Return success response with X-Environment: sandbox
+    return createSandboxSuccessResponse(
       result.data,
       requestId,
       startTime,
@@ -329,7 +320,7 @@ export async function POST(
     );
   } catch (error) {
     const response = handleApiError(error, requestId);
-    response.headers.set("X-Environment", "production");
+    response.headers.set("X-Environment", "sandbox");
     return response;
   }
 }

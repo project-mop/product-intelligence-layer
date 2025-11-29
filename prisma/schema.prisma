@@ -20,6 +20,13 @@ enum Environment {
     PRODUCTION
 }
 
+/// Version status for process version lifecycle
+enum VersionStatus {
+    DRAFT
+    ACTIVE
+    DEPRECATED
+}
+
 // =============================================================================
 // MULTI-TENANT CORE
 // =============================================================================
@@ -145,14 +152,17 @@ model Process {
 
 /// ProcessVersion represents a specific version of a process configuration
 model ProcessVersion {
-    id           String       @id // procv_* prefix
+    id           String        @id // procv_* prefix
     processId    String
     version      String // Semantic version (e.g., "1.0.0")
     config       Json // ProcessConfig: systemPrompt, temperature, cacheTtl, etc.
-    environment  Environment
-    publishedAt  DateTime?
-    deprecatedAt DateTime?
-    createdAt    DateTime     @default(now())
+    environment  Environment   @default(SANDBOX)
+    status       VersionStatus @default(DRAFT)
+    publishedAt  DateTime?     @map("published_at")
+    deprecatedAt DateTime?     @map("deprecated_at")
+    changeNotes  String?       @map("change_notes")
+    promotedBy   String?       @map("promoted_by")
+    createdAt    DateTime      @default(now())
 
     // Relations
     process  Process   @relation(fields: [processId], references: [id], onDelete: Cascade)
@@ -160,8 +170,8 @@ model ProcessVersion {
 
     @@unique([processId, version])
     @@index([processId])
-    @@index([processId, environment])
-    @@index([environment, deprecatedAt])
+    @@index([processId, environment, status])
+    @@index([processId, deprecatedAt])
 }
 
 // =============================================================================

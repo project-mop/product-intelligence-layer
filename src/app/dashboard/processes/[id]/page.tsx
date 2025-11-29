@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback } from "react";
+import { use, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Loader2, FileText, Play, FileJson } from "lucide-react";
@@ -12,6 +12,9 @@ import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { EndpointUrl } from "~/components/process/EndpointUrl";
 import { CacheTtlSettings } from "~/components/process/CacheTtlSettings";
+import { EnvironmentBanner } from "~/components/process/EnvironmentBanner";
+import { EnvironmentSelector } from "~/components/process/EnvironmentSelector";
+import { EnvironmentBadge } from "~/components/process/EnvironmentBadge";
 import { DEFAULT_PROCESS_CONFIG } from "~/server/services/process/types";
 
 function formatDate(date: Date | null): string {
@@ -68,6 +71,9 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
     },
     [processId, updateVersionConfig]
   );
+
+  // Story 5.1: Environment state management - must be before early returns
+  const [selectedEnvironment, setSelectedEnvironment] = useState<"SANDBOX" | "PRODUCTION">("SANDBOX");
 
   // Loading state
   if (isLoading) {
@@ -129,9 +135,19 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
     (v) => v.environment === "SANDBOX" || v.environment === "PRODUCTION"
   );
 
-  // Get cache settings from latest version config
-  const latestVersion = process.versions[0];
-  const versionConfig = (latestVersion?.config ?? {}) as {
+  // Story 5.1 AC: 5 - Check version status for both environments
+  const sandboxVersion = process.versions.find(
+    (v) => v.environment === "SANDBOX" && v.deprecatedAt === null
+  );
+  const productionVersion = process.versions.find(
+    (v) => v.environment === "PRODUCTION" && v.deprecatedAt === null
+  );
+
+  // Get cache settings from the version for the selected environment
+  const activeVersion = selectedEnvironment === "PRODUCTION" && productionVersion
+    ? productionVersion
+    : sandboxVersion;
+  const versionConfig = (activeVersion?.config ?? {}) as {
     cacheTtlSeconds?: number;
     cacheEnabled?: boolean;
   };
@@ -139,66 +155,85 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
   const cacheEnabled = versionConfig.cacheEnabled ?? DEFAULT_PROCESS_CONFIG.cacheEnabled;
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="mx-auto max-w-4xl">
-        {/* Header */}
-        <div className="mb-6">
-          <Link
-            href="/dashboard/processes"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Intelligences
-          </Link>
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Story 5.1 AC: 4 - Environment banner at top */}
+      <EnvironmentBanner environment={selectedEnvironment} />
 
-        {/* Title and Actions */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">
-                {process.name}
-              </h1>
-              <Badge
-                variant={process.hasProductionVersion ? "default" : "secondary"}
-              >
-                {process.hasProductionVersion ? "Live" : "Sandbox"}
-              </Badge>
-            </div>
-            {process.description && (
-              <p className="mt-2 text-muted-foreground">{process.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Schema button - Story 3.5 AC: 1 */}
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/dashboard/processes/${processId}/schema`)}
+      <div className="p-8">
+        <div className="mx-auto max-w-4xl">
+          {/* Header */}
+          <div className="mb-6">
+            <Link
+              href="/dashboard/processes"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              <FileJson className="h-4 w-4 mr-2" />
-              Schema
-            </Button>
-            {/* Test button - Story 3.3 AC: 1 */}
-            {hasPublishedVersion && (
+              <ArrowLeft className="h-4 w-4" />
+              Back to Intelligences
+            </Link>
+          </div>
+
+          {/* Title and Actions */}
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-foreground">
+                  {process.name}
+                </h1>
+                {/* Story 5.1 AC: 5 - Show version status for both environments */}
+                <div className="flex items-center gap-2">
+                  {sandboxVersion && <EnvironmentBadge environment="SANDBOX" size="md" />}
+                  {productionVersion && <EnvironmentBadge environment="PRODUCTION" size="md" />}
+                </div>
+              </div>
+              {process.description && (
+                <p className="mt-2 text-muted-foreground">{process.description}</p>
+              )}
+              {/* Story 5.1 AC: 5 - Version status summary */}
+              <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                <span>
+                  Sandbox: {sandboxVersion ? `v${sandboxVersion.version}` : "Not deployed"}
+                </span>
+                <span>
+                  Production: {productionVersion ? `v${productionVersion.version}` : "Not deployed"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Story 5.1 AC: 9, 10 - Environment selector */}
+              <EnvironmentSelector
+                currentEnvironment={selectedEnvironment}
+                onEnvironmentChange={setSelectedEnvironment}
+                productionAvailable={!!productionVersion}
+              />
+              {/* Schema button - Story 3.5 AC: 1 */}
               <Button
                 variant="outline"
-                onClick={() => router.push(`/dashboard/processes/${processId}/test`)}
+                onClick={() => router.push(`/dashboard/processes/${processId}/schema`)}
               >
-                <Play className="h-4 w-4 mr-2" />
-                Test
+                <FileJson className="h-4 w-4 mr-2" />
+                Schema
               </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/dashboard/processes/${processId}/edit`)}
-            >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
+              {/* Test button - Story 3.3 AC: 1 */}
+              {hasPublishedVersion && (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/dashboard/processes/${processId}/test`)}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Test
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/processes/${processId}/edit`)}
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Endpoint URL - Positioned prominently (AC: 3) */}
+          {/* Endpoint URL - Positioned prominently (AC: 3) */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">API Endpoint</CardTitle>
@@ -207,6 +242,7 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
             <EndpointUrl
               processId={processId}
               isPublished={hasPublishedVersion}
+              environment={selectedEnvironment}
             />
             {/* API Docs link - Story 3.6 AC: 1 */}
             <div className="mt-4 pt-4 border-t">
@@ -317,7 +353,8 @@ export default function ProcessDetailPage({ params }: ProcessDetailPageProps) {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );

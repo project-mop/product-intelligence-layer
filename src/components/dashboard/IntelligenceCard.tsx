@@ -15,6 +15,7 @@ import { FlaskConical, Pencil, FileText } from "lucide-react";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { ProcessStatusBadge } from "./ProcessStatusBadge";
+import { EnvironmentBadge } from "~/components/process/EnvironmentBadge";
 import type { ProcessStatus } from "~/lib/process/status";
 
 /**
@@ -25,6 +26,8 @@ export interface ProcessWithStatus {
   name: string;
   description: string | null;
   status: ProcessStatus;
+  hasSandbox?: boolean;
+  hasProduction?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,7 +68,16 @@ export function IntelligenceCard({
             <h3 className="font-semibold text-foreground truncate flex-1 min-w-0">
               {process.name}
             </h3>
-            <ProcessStatusBadge status={process.status} />
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Environment badges - Story 5.1 AC: 8 */}
+              {process.hasSandbox && (
+                <EnvironmentBadge environment="SANDBOX" size="sm" />
+              )}
+              {process.hasProduction && (
+                <EnvironmentBadge environment="PRODUCTION" size="sm" />
+              )}
+              <ProcessStatusBadge status={process.status} />
+            </div>
           </div>
 
           {/* Description */}

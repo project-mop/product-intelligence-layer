@@ -7,7 +7,7 @@
  * @module tests/support/factories/process-version.factory
  */
 
-import type { ProcessVersion, Environment, Process } from "../../../generated/prisma";
+import type { ProcessVersion, Environment, Process, VersionStatus } from "../../../generated/prisma";
 import { generateProcessVersionId, generateProcessId, generateTenantId } from "~/lib/id";
 import { testDb } from "../db";
 
@@ -35,8 +35,11 @@ const defaultProcessVersion = (): Omit<ProcessVersion, "id" | "processId"> => ({
   version: `1.0.${++counter}`,
   config: defaultConfig,
   environment: "SANDBOX" as Environment,
+  status: "DRAFT" as VersionStatus,
   publishedAt: null,
   deprecatedAt: null,
+  changeNotes: null,
+  promotedBy: null,
   createdAt: new Date(),
 });
 
@@ -178,8 +181,11 @@ async function createWithProcess(
       version: versionOverrides.version ?? defaults.version,
       config: versionOverrides.config ?? defaults.config ?? defaultConfig,
       environment: versionOverrides.environment ?? defaults.environment,
+      status: versionOverrides.status ?? defaults.status,
       publishedAt: versionOverrides.publishedAt ?? defaults.publishedAt,
       deprecatedAt: versionOverrides.deprecatedAt ?? defaults.deprecatedAt,
+      changeNotes: versionOverrides.changeNotes ?? defaults.changeNotes,
+      promotedBy: versionOverrides.promotedBy ?? defaults.promotedBy,
       createdAt: versionOverrides.createdAt ?? defaults.createdAt,
     },
   });
@@ -235,26 +241,42 @@ async function createMany(
 }
 
 /**
- * Creates a production-ready process version (published, PRODUCTION environment).
+ * Creates a production-ready process version (published, PRODUCTION environment, ACTIVE status).
  */
 async function createProduction(
   overrides: ProcessVersionFactoryOptions = {}
 ): Promise<ProcessVersion> {
   return create({
     environment: "PRODUCTION" as Environment,
+    status: "ACTIVE" as VersionStatus,
     publishedAt: new Date(),
     ...overrides,
   });
 }
 
 /**
- * Creates a deprecated process version.
+ * Creates a deprecated process version (DEPRECATED status).
  */
 async function createDeprecated(
   overrides: ProcessVersionFactoryOptions = {}
 ): Promise<ProcessVersion> {
   return create({
+    status: "DEPRECATED" as VersionStatus,
     deprecatedAt: new Date(),
+    ...overrides,
+  });
+}
+
+/**
+ * Creates an active sandbox version (ACTIVE status, SANDBOX environment).
+ */
+async function createActiveSandbox(
+  overrides: ProcessVersionFactoryOptions = {}
+): Promise<ProcessVersion> {
+  return create({
+    environment: "SANDBOX" as Environment,
+    status: "ACTIVE" as VersionStatus,
+    publishedAt: new Date(),
     ...overrides,
   });
 }
@@ -273,6 +295,7 @@ export const processVersionFactory = {
   createMany,
   createProduction,
   createDeprecated,
+  createActiveSandbox,
   resetCounter,
   /** Default config for reference in tests */
   defaults: {

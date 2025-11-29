@@ -359,11 +359,20 @@ export const processRouter = createTRPCRouter({
       // Map processes and compute status
       const processesWithStatus = processes.map((process) => {
         const status = computeProcessStatus(process.versions);
+        // Story 5.1 AC: 8 - Environment indicators visible in process list
+        const hasSandbox = process.versions.some(
+          (v) => v.environment === "SANDBOX" && v.deprecatedAt === null
+        );
+        const hasProduction = process.versions.some(
+          (v) => v.environment === "PRODUCTION" && v.deprecatedAt === null
+        );
         return {
           id: process.id,
           name: process.name,
           description: process.description,
           status,
+          hasSandbox,
+          hasProduction,
           createdAt: process.createdAt,
           updatedAt: process.updatedAt,
         };
@@ -484,6 +493,7 @@ export const processRouter = createTRPCRouter({
             version: "1.0.0",
             config: initialConfig as Prisma.InputJsonValue,
             environment: "SANDBOX",
+            status: "DRAFT",
           },
         });
 
@@ -655,6 +665,7 @@ export const processRouter = createTRPCRouter({
             version: "1.0.0",
             config: sourceConfig as Prisma.InputJsonValue,
             environment: "SANDBOX",
+            status: "DRAFT",
           },
         });
 
@@ -861,6 +872,7 @@ export const processRouter = createTRPCRouter({
           version: `${latestVersion.version}-draft`,
           config: latestVersion.config as Prisma.InputJsonValue,
           environment: "SANDBOX",
+          status: "DRAFT",
         },
       });
 
@@ -1160,5 +1172,162 @@ export const processRouter = createTRPCRouter({
       });
 
       return updatedVersion;
+    }),
+
+  /**
+   * List all versions for a process with environment information.
+   *
+   * Story 5.1 AC: 5 - Process detail page shows both sandbox and production version status.
+   */
+  listVersions: protectedProcedure
+    .input(processIdInput)
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Verify process exists and belongs to tenant
+      const process = await db.process.findFirst({
+        where: {
+          id: input.id,
+          tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Get all versions for this process
+      const versions = await db.processVersion.findMany({
+        where: { processId: input.id },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Find active version for each environment
+      const sandboxVersion = versions.find(
+        (v) =>
+          v.environment === "SANDBOX" &&
+          v.deprecatedAt === null &&
+          (v.status === "ACTIVE" || v.status === "DRAFT")
+      );
+
+      const productionVersion = versions.find(
+        (v) =>
+          v.environment === "PRODUCTION" &&
+          v.deprecatedAt === null &&
+          v.status === "ACTIVE"
+      );
+
+      return {
+        versions: versions.map((v) => ({
+          id: v.id,
+          version: v.version,
+          environment: v.environment,
+          status: v.status,
+          publishedAt: v.publishedAt,
+          deprecatedAt: v.deprecatedAt,
+          changeNotes: v.changeNotes,
+          createdAt: v.createdAt,
+          isCurrent:
+            (v.environment === "SANDBOX" && v.id === sandboxVersion?.id) ||
+            (v.environment === "PRODUCTION" && v.id === productionVersion?.id),
+        })),
+        sandbox: sandboxVersion
+          ? {
+              id: sandboxVersion.id,
+              version: sandboxVersion.version,
+              status: sandboxVersion.status,
+              publishedAt: sandboxVersion.publishedAt,
+            }
+          : null,
+        production: productionVersion
+          ? {
+              id: productionVersion.id,
+              version: productionVersion.version,
+              status: productionVersion.status,
+              publishedAt: productionVersion.publishedAt,
+            }
+          : null,
+      };
+    }),
+
+  /**
+   * Get the active version for a specific environment.
+   *
+   * Story 5.1 AC: 5, 6 - Get active version per environment.
+   */
+  getActiveVersion: protectedProcedure
+    .input(
+      z.object({
+        processId: z.string().min(1, "Process ID is required"),
+        environment: z.enum(["SANDBOX", "PRODUCTION"]),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const tenantId = ctx.session.user.tenantId;
+
+      if (!tenantId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "User has no associated tenant",
+        });
+      }
+
+      // Verify process exists and belongs to tenant
+      const process = await db.process.findFirst({
+        where: {
+          id: input.processId,
+          tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!process) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Process not found",
+        });
+      }
+
+      // Find active version for the requested environment
+      const versions = await db.processVersion.findMany({
+        where: {
+          processId: input.processId,
+          environment: input.environment,
+          deprecatedAt: null,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // For SANDBOX, accept ACTIVE or DRAFT status
+      // For PRODUCTION, only accept ACTIVE status
+      const activeVersion =
+        input.environment === "SANDBOX"
+          ? versions.find((v) => v.status === "ACTIVE" || v.status === "DRAFT")
+          : versions.find((v) => v.status === "ACTIVE");
+
+      if (!activeVersion) {
+        return null;
+      }
+
+      return {
+        id: activeVersion.id,
+        version: activeVersion.version,
+        environment: activeVersion.environment,
+        status: activeVersion.status,
+        config: activeVersion.config,
+        publishedAt: activeVersion.publishedAt,
+        createdAt: activeVersion.createdAt,
+      };
     }),
 });

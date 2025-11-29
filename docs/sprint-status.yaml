@@ -79,8 +79,8 @@ development_status:
   epic-4-retrospective: completed
 
   # Epic 5: Environments & Versioning (5 stories)
-  epic-5: backlog
-  5-1-sandbox-and-production-modes: backlog
+  epic-5: contexted
+  5-1-sandbox-and-production-modes: done
   5-2-separate-api-keys-per-environment: backlog
   5-3-promote-to-production: backlog
   5-4-version-history-and-rollback: backlog

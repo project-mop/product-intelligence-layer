@@ -1,0 +1,262 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>1</storyId>
+    <title>Sandbox and Production Modes</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/5-1-sandbox-and-production-modes.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>each intelligence process to have sandbox and production modes with separate endpoint URLs</iWant>
+    <soThat>I can test changes safely before going live, following the enterprise deployment workflow I'm familiar with from ERP systems</soThat>
+    <tasks>
+      <task id="1">Add Environment and VersionStatus enums to Prisma Schema (AC: 1, 6)</task>
+      <task id="2">Extend ProcessVersion model with environment fields (AC: 1, 5, 6)</task>
+      <task id="3">Create migration for existing ProcessVersions (AC: 1)</task>
+      <task id="4">Create sandbox API route (AC: 2, 7)</task>
+      <task id="5">Update production API route (AC: 3, 7)</task>
+      <task id="6">Create Version Resolver Service (AC: 5, 6)</task>
+      <task id="7">Update process tRPC router for environment (AC: 1, 5, 6)</task>
+      <task id="8">Add environment to process version queries (AC: 5)</task>
+      <task id="9">Create EnvironmentBadge UI component (AC: 4, 8)</task>
+      <task id="10">Create EnvironmentBanner UI component (AC: 4)</task>
+      <task id="11">Update ProcessList to show environment badges (AC: 8)</task>
+      <task id="12">Update ProcessDetail page for environment awareness (AC: 4, 5)</task>
+      <task id="13">Add EnvironmentSelector component (AC: 9, 10)</task>
+      <task id="14">Update test console for environment (AC: 9)</task>
+      <task id="15">Update endpoint URL display (AC: 10)</task>
+      <task id="16">Write unit tests for Version Resolver (AC: 5, 6)</task>
+      <task id="17">Write integration tests for environment routes (AC: 2, 3, 7)</task>
+      <task id="18">Write integration tests for process router environment (AC: 1, 5, 6)</task>
+      <task id="19">Verification (AC: 1-10)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">New intelligences are created in sandbox mode by default (FR-601)</criterion>
+    <criterion id="2">Sandbox endpoints use URL pattern `/api/v1/sandbox/intelligence/:processId/generate`</criterion>
+    <criterion id="3">Production endpoints use URL pattern `/api/v1/intelligence/:processId/generate`</criterion>
+    <criterion id="4">UI clearly displays current environment with visual distinction (sandbox=yellow banner, production=green)</criterion>
+    <criterion id="5">Process detail page shows both sandbox and production version status</criterion>
+    <criterion id="6">Sandbox version can be edited freely without affecting production</criterion>
+    <criterion id="7">Production endpoint returns 404 until first promotion (no production version exists)</criterion>
+    <criterion id="8">Environment indicator visible in process list view (badge per row)</criterion>
+    <criterion id="9">Test console defaults to sandbox environment</criterion>
+    <criterion id="10">Environment switch in UI updates all displayed URLs and keys</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-5.md</path>
+        <title>Epic Technical Specification: Environments &amp; Versioning</title>
+        <section>Story 5.1: Sandbox and Production Modes</section>
+        <snippet>Defines AC 1-10 for sandbox/production modes, schema changes for ProcessVersion (environment, status, publishedAt, deprecatedAt), and sandbox URL patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Process Version Lifecycle</section>
+        <snippet>Documents version lifecycle: CREATED -> SANDBOX -> PRODUCTION -> DEPRECATED. Only ONE version per process can be PRODUCTION at a time. Environment is tied to API key.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Intelligence Generation Flow</section>
+        <snippet>Customer Request -> API Key Auth -> Rate Limit Check -> Input Validation -> Cache Lookup -> LLM Gateway -> Output Validation -> Response. Story 5.1 adds environment check after auth.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Permission Checking Patterns</section>
+        <snippet>API key context includes environment field ("SANDBOX" | "PRODUCTION"). Process version lookup must filter by ctx.environment. Prevents sandbox keys hitting production.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Public API Patterns</section>
+        <snippet>URL pattern: POST /api/v1/intelligence/:processId/generate. Story 5.1 adds: POST /api/v1/sandbox/intelligence/:processId/generate for sandbox environment.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Test Patterns</section>
+        <snippet>Unit tests: Vitest in tests/unit/. Integration tests: Vitest in tests/integration/ with real database. tRPC router tests use createAuthenticatedCaller. 90% line coverage threshold.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing-strategy-mvp.md</path>
+        <title>Testing Strategy (MVP)</title>
+        <section>Factory Usage</section>
+        <snippet>processVersionFactory supports createProduction() for PRODUCTION versions with publishedAt set. Use createWithProcess() for full tenant+process+version setup.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>ProcessVersion model, Environment enum</symbol>
+        <lines>118-165</lines>
+        <reason>ProcessVersion already has environment field and Environment enum (SANDBOX, PRODUCTION). Story adds: VersionStatus enum, status field, publishedAt, deprecatedAt, changeNotes, promotedBy fields, and composite indexes.</reason>
+      </file>
+      <file>
+        <path>src/app/api/v1/intelligence/[processId]/generate/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST handler</symbol>
+        <lines>82-289</lines>
+        <reason>Current production endpoint. Already filters versions by apiKeyContext.environment. Story 5.1: Copy logic to sandbox route, update production to return 404 if no PRODUCTION version.</reason>
+      </file>
+      <file>
+        <path>src/server/api/routers/process.ts</path>
+        <kind>trpc-router</kind>
+        <symbol>processRouter</symbol>
+        <lines>233-1164</lines>
+        <reason>Process CRUD operations. create() already sets environment="SANDBOX". Story adds: queries by environment, immutability checks for production versions, version.listByProcess query.</reason>
+      </file>
+      <file>
+        <path>src/server/services/auth/api-key-validator.ts</path>
+        <kind>service</kind>
+        <symbol>validateApiKey, ApiKeyContext</symbol>
+        <lines>N/A</lines>
+        <reason>Returns ApiKeyContext with environment field. Used by generate route for environment-scoped version lookup.</reason>
+      </file>
+      <file>
+        <path>src/components/process/EndpointUrl.tsx</path>
+        <kind>component</kind>
+        <symbol>EndpointUrl</symbol>
+        <lines>1-113</lines>
+        <reason>Displays API endpoint URL with copy functionality. Story 5.1: Update to show environment-specific URLs (/sandbox/ prefix or production).</reason>
+      </file>
+      <file>
+        <path>src/components/process/TestConsole.tsx</path>
+        <kind>component</kind>
+        <symbol>TestConsole</symbol>
+        <lines>1-321</lines>
+        <reason>In-browser endpoint testing. Story 5.1: Default to sandbox environment, add environment indicator, update cURL command for correct environment URL.</reason>
+      </file>
+      <file>
+        <path>tests/support/factories/process-version.factory.ts</path>
+        <kind>test-factory</kind>
+        <symbol>processVersionFactory</symbol>
+        <lines>1-281</lines>
+        <reason>Factory for test data. Already has createProduction(), createDeprecated(). May need updates for VersionStatus enum support.</reason>
+      </file>
+      <file>
+        <path>tests/integration/intelligence-api.test.ts</path>
+        <kind>test</kind>
+        <symbol>POST /api/v1/intelligence/:processId/generate tests</symbol>
+        <lines>1-150+</lines>
+        <reason>Integration tests for intelligence API. Story 5.1 adds: describe block for "Story 5.1: Sandbox and Production Modes" with sandbox route tests, 404 for production before promotion.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@prisma/client" version="^7.0.1">ORM for database access, ProcessVersion model</package>
+        <package name="next" version="^15.2.3">App Router for API routes</package>
+        <package name="@trpc/server" version="^11.0.0">tRPC for internal dashboard APIs</package>
+        <package name="zod" version="^3.24.2">Input validation for router procedures</package>
+        <package name="vitest" version="^4.0.14">Unit and integration test framework</package>
+        <package name="lucide-react" version="^0.555.0">Icons for UI components (Check, Badge)</package>
+        <package name="sonner" version="^2.0.7">Toast notifications for copy confirmation</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture">Environment is stored at ProcessVersion level, not Process level</constraint>
+    <constraint source="architecture">Each process can have ONE active version per environment</constraint>
+    <constraint source="architecture">Sandbox and production use separate URL paths for clear separation</constraint>
+    <constraint source="architecture">Environment is NOT in API key yet (Story 5.2) - this story uses path-based separation only</constraint>
+    <constraint source="dev-notes">ALWAYS filter database queries by tenantId for tenant isolation</constraint>
+    <constraint source="dev-notes">Production versions are immutable - cannot be edited once promoted</constraint>
+    <constraint source="dev-notes">Use transaction for atomic operations (create process + version)</constraint>
+    <constraint source="testing-strategy">Integration tests use real database with automatic cleanup</constraint>
+    <constraint source="testing-strategy">90% line coverage, 70% function coverage thresholds</constraint>
+    <constraint source="architecture">API routes return standard error format: { success: false, error: { code, message, details } }</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Environment enum (new)</name>
+      <kind>Prisma enum</kind>
+      <signature>enum Environment { SANDBOX, PRODUCTION }</signature>
+      <path>prisma/schema.prisma:18-21</path>
+    </interface>
+    <interface>
+      <name>VersionStatus enum (to add)</name>
+      <kind>Prisma enum</kind>
+      <signature>enum VersionStatus { DRAFT, ACTIVE, DEPRECATED }</signature>
+      <path>prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>ProcessVersion model fields (to add)</name>
+      <kind>Prisma model fields</kind>
+      <signature>status: VersionStatus @default(DRAFT), publishedAt: DateTime?, deprecatedAt: DateTime?, changeNotes: String?, promotedBy: String?</signature>
+      <path>prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>ResolveVersionParams</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ processId: string; tenantId: string; environment: "SANDBOX" | "PRODUCTION"; pinnedVersion?: number; }</signature>
+      <path>src/server/services/process/version-resolver.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>ResolvedVersion</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ version: ProcessVersion; isDeprecated: boolean; latestVersionNumber: number; } | null</signature>
+      <path>src/server/services/process/version-resolver.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>EnvironmentBadgeProps</name>
+      <kind>React component props</kind>
+      <signature>{ environment: "SANDBOX" | "PRODUCTION"; size?: "sm" | "md" | "lg"; }</signature>
+      <path>src/components/process/EnvironmentBadge.tsx (to create)</path>
+    </interface>
+    <interface>
+      <name>EnvironmentBannerProps</name>
+      <kind>React component props</kind>
+      <signature>{ environment: "SANDBOX" | "PRODUCTION"; message?: string; }</signature>
+      <path>src/components/process/EnvironmentBanner.tsx (to create)</path>
+    </interface>
+    <interface>
+      <name>EnvironmentSelectorProps</name>
+      <kind>React component props</kind>
+      <signature>{ currentEnvironment: "SANDBOX" | "PRODUCTION"; onEnvironmentChange: (env: "SANDBOX" | "PRODUCTION") => void; productionAvailable: boolean; }</signature>
+      <path>src/components/process/EnvironmentSelector.tsx (to create)</path>
+    </interface>
+    <interface>
+      <name>Sandbox Generate Endpoint</name>
+      <kind>REST API</kind>
+      <signature>POST /api/v1/sandbox/intelligence/:processId/generate - Headers: Authorization: Bearer pil_test_*, X-Environment: sandbox</signature>
+      <path>src/app/api/v1/sandbox/intelligence/[processId]/generate/route.ts (to create)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with mocked dependencies. Integration tests use real PostgreSQL test database with automatic cleanup before each test. tRPC router tests use createAuthenticatedCaller/createUnauthenticatedCaller helpers. API route tests use direct handler calls with NextRequest mocking. Coverage thresholds: 90% lines, 70% functions, 90% branches, 90% statements. Follow Arrange-Act-Assert pattern. Test both success and error paths.
+    </standards>
+    <locations>
+      <location>tests/unit/ - Unit tests for services and utilities</location>
+      <location>tests/unit/server/services/process/version-resolver.test.ts - Version resolver unit tests (to create)</location>
+      <location>tests/integration/intelligence-api.test.ts - REST API integration tests</location>
+      <location>tests/integration/process-router.test.ts - tRPC router integration tests</location>
+      <location>tests/support/factories/ - Test data factories</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test: process.create sets environment = SANDBOX by default</idea>
+      <idea ac="2">Test: POST to /api/v1/sandbox/intelligence/:processId/generate succeeds with sandbox version</idea>
+      <idea ac="3">Test: POST to /api/v1/intelligence/:processId/generate returns 404 before any promotion</idea>
+      <idea ac="5">Test: version.listByProcess returns versions with environment field</idea>
+      <idea ac="6">Test: Updating sandbox version does not affect production version</idea>
+      <idea ac="7">Test: Production endpoint returns 404 with message "No production version. Promote a sandbox version first."</idea>
+      <idea ac="7">Test: X-Environment header returned correctly (sandbox or production)</idea>
+      <idea ac="resolver">Test: resolveVersion returns active sandbox version when environment=SANDBOX</idea>
+      <idea ac="resolver">Test: resolveVersion returns null when no version exists for environment</idea>
+      <idea ac="resolver">Test: resolveVersion ignores deprecated versions</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -15,6 +15,8 @@ interface EndpointUrlProps {
   isPublished: boolean;
   /** Optional class name for styling */
   className?: string;
+  /** Current selected environment - Story 5.1 */
+  environment?: "SANDBOX" | "PRODUCTION";
 }
 
 /**
@@ -28,7 +30,12 @@ interface EndpointUrlProps {
  *
  * @see docs/stories/3-1-endpoint-url-generation.md
  */
-export function EndpointUrl({ processId, isPublished, className }: EndpointUrlProps) {
+export function EndpointUrl({
+  processId,
+  isPublished,
+  className,
+  environment = "SANDBOX",
+}: EndpointUrlProps) {
   const [copied, setCopied] = useState(false);
 
   // Build the full endpoint URL using the base URL
@@ -36,7 +43,14 @@ export function EndpointUrl({ processId, isPublished, className }: EndpointUrlPr
     typeof window !== "undefined"
       ? window.location.origin
       : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const endpointUrl = `${baseUrl}/api/v1/intelligence/${processId}/generate`;
+
+  // Story 5.1 AC: 7 - Environment-specific URLs
+  // Sandbox: /api/v1/sandbox/intelligence/:processId/generate
+  // Production: /api/v1/intelligence/:processId/generate
+  const endpointUrl =
+    environment === "SANDBOX"
+      ? `${baseUrl}/api/v1/sandbox/intelligence/${processId}/generate`
+      : `${baseUrl}/api/v1/intelligence/${processId}/generate`;
 
   /**
    * Copy the endpoint URL to clipboard with toast confirmation.

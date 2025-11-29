@@ -12,6 +12,10 @@ import type { ProcessVersion, Environment, VersionStatus } from "../../../../gen
 import { db } from "~/server/db";
 import { ApiError, ErrorCode, ERROR_HTTP_STATUS } from "~/lib/errors";
 import { calculateSunsetDate } from "./sunset";
+import { extractVersionNumber } from "./version-utils";
+
+// Re-export for backwards compatibility
+export { extractVersionNumber } from "./version-utils";
 
 /**
  * Parameters for resolving a process version
@@ -54,17 +58,6 @@ export class VersionResolutionError extends ApiError {
   }
 }
 
-/**
- * Extract integer version number from semver string.
- * Versions are stored as "1.0.0", "2.0.0", etc. We extract the major number.
- *
- * @param semverString - Version string like "1.0.0"
- * @returns Integer version number (e.g., 1)
- */
-export function extractVersionNumber(semverString: string): number {
-  const match = semverString.match(/^(\d+)/);
-  return match && match[1] ? parseInt(match[1], 10) : 0;
-}
 
 /**
  * Get available version numbers for a process in a specific environment.

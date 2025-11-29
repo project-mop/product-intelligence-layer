@@ -24,7 +24,7 @@ import {
 } from "~/server/services/process/version-headers";
 import {
   extractVersionNumber
-} from "~/server/services/process/version-resolver";
+} from "~/server/services/process/version-utils";
 import { ApiError, ErrorCode } from "~/lib/errors";
 
 describe("parseVersionHeader", () => {

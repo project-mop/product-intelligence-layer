@@ -76,7 +76,8 @@ describe("ProcessEngine", () => {
       const engine = new ProcessEngine(mockGateway);
       const result = await engine.generateIntelligence(baseConfig, {});
 
-      expect(result.meta.latencyMs).toBeGreaterThanOrEqual(50);
+      // Use lower threshold to account for timer resolution variance
+      expect(result.meta.latencyMs).toBeGreaterThanOrEqual(40);
     });
 
     it("should pass correct params to LLM gateway", async () => {

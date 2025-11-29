@@ -9,7 +9,7 @@
  */
 
 import type { ResolvedVersion } from "./version-resolver";
-import { extractVersionNumber } from "./version-resolver";
+import { extractVersionNumber } from "./version-utils";
 import { daysUntilSunset } from "./sunset";
 
 /**
